@@ -1,0 +1,389 @@
+import { useSyncExternalStore, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+
+export type CategoriaTec =
+  | "hidrica"
+  | "saneamento"
+  | "ambiente"
+  | "alimentacao"
+  | "energia"
+  | "agroecologia"
+  | "inclusao"
+  | "formacao"
+  | "comunicacao";
+
+export interface Tecnologia {
+  id: string;
+  categoria: CategoriaTec;
+  nome: string;
+  quantidade: number;
+  unidade: string;
+  familias?: number;
+  municipios: string;
+  comunidades?: string;
+  projetoId?: string;
+  data: string;
+  observacoes?: string;
+}
+
+const catToLineId: Record<CategoriaTec, number> = {
+  hidrica: 1,
+  saneamento: 2,
+  energia: 3,
+  agroecologia: 4,
+  alimentacao: 5,
+  inclusao: 6,
+  formacao: 7,
+  ambiente: 8,
+  comunicacao: 9,
+};
+
+const lineIdToCat: Record<number, CategoriaTec> = {
+  1: "hidrica",
+  2: "saneamento",
+  3: "energia",
+  4: "agroecologia",
+  5: "alimentacao",
+  6: "inclusao",
+  7: "formacao",
+  8: "ambiente",
+  9: "comunicacao",
+};
+
+export const CATEGORIA_ORDEM: CategoriaTec[] = [
+  "hidrica",
+  "saneamento",
+  "energia",
+  "agroecologia",
+  "alimentacao",
+  "inclusao",
+  "formacao",
+  "ambiente",
+  "comunicacao",
+];
+
+export const CATEGORIAS: Record<
+  CategoriaTec,
+  {
+    label: string;
+    emoji: string;
+    color: string;
+    exemplos: string[];
+    unidades: string[];
+    mostraFamilias?: boolean;
+  }
+> = {
+  hidrica: {
+    label: "Convivência com o Semiárido e Segurança Hídrica",
+    emoji: "💧",
+    color: "#1A9FD4",
+    exemplos: [
+      "Cisternas de consumo humano",
+      "Cisternas calçadão",
+      "Barreiro trincheira",
+      "Reuso de águas cinzas",
+      "Sistemas simplificados de irrigação",
+      "Captação e armazenamento de água da chuva",
+      "Barragens subterrâneas",
+    ],
+    unidades: ["unidades"],
+  },
+  saneamento: {
+    label: "Saneamento Rural",
+    emoji: "🚿",
+    color: "#4CAF50",
+    exemplos: ["Banheiro redondo"],
+    unidades: ["unidades"],
+  },
+  ambiente: {
+    label: "Meio Ambiente e Restauração Ecológica",
+    emoji: "🌳",
+    color: "#33691E",
+    exemplos: [
+      "Recuperação de áreas degradadas",
+      "Produção de mudas nativas",
+      "Plantio de mudas",
+      "Manejo sustentável da Caatinga",
+    ],
+    unidades: ["hectares", "unidades"],
+  },
+  alimentacao: {
+    label: "Segurança Alimentar e Nutricional",
+    emoji: "🌽",
+    color: "#E65100",
+    exemplos: [
+      "Hortas comunitárias",
+      "Beneficiamento de alimentos",
+      "Produção de polpas e derivados",
+    ],
+    unidades: ["unidades", "famílias"],
+    mostraFamilias: true,
+  },
+  energia: {
+    label: "Energias Renováveis",
+    emoji: "⚡",
+    color: "#F5A623",
+    exemplos: [
+      "Sistemas fotovoltaicos para produção agrícola",
+      "Energia solar residencial",
+      "Bombeamento solar",
+      "Biodigestores",
+    ],
+    unidades: ["unidades"],
+  },
+  agroecologia: {
+    label: "Agroecologia e Produção Sustentável",
+    emoji: "🌱",
+    color: "#2E7D32",
+    exemplos: [
+      "Quintais produtivos agroecológicos",
+      "Sistemas agroflorestais (SAFs)",
+      "Adubação verde",
+      "Compostagem",
+      "Biofertilizantes",
+      "Produção agroecológica da mandioca",
+      "Bancos comunitários de sementes crioulas",
+      "Manejo ecológico do solo",
+    ],
+    unidades: ["unidades", "hectares", "famílias"],
+    mostraFamilias: true,
+  },
+  inclusao: {
+    label: "Inclusão Socioprodutiva e Economia Solidária",
+    emoji: "🤝",
+    color: "#7B1FA2",
+    exemplos: [
+      "Casas de farinha",
+      "Agroindústrias familiares",
+      "Apicultura sustentável",
+      "Comercialização coletiva",
+      "Grupos produtivos de mulheres e juventudes",
+      "Feiras agroecológicas",
+    ],
+    unidades: ["unidades", "famílias"],
+    mostraFamilias: true,
+  },
+  formacao: {
+    label: "Formação, ATER e Gestão Social",
+    emoji: "📚",
+    color: "#1565C0",
+    exemplos: [
+      "Diagnóstico Rural Participativo (DRP)",
+      "Intercâmbios de experiências",
+      "Formação de agentes multiplicadores",
+      "Dias de campo",
+      "Planejamento participativo comunitário",
+    ],
+    unidades: ["unidades"],
+  },
+  comunicacao: {
+    label: "Comunicação Popular e Mobilização Social",
+    emoji: "📻",
+    color: "#C62828",
+    exemplos: [
+      "Programas de rádio",
+      "Produção de vídeos populares",
+      "Sistematização de experiências",
+    ],
+    unidades: ["unidades"],
+  },
+};
+
+let tecnologias: Tecnologia[] = [];
+
+const listeners = new Set<() => void>();
+const subscribe = (cb: () => void) => {
+  listeners.add(cb);
+  return () => {
+    listeners.delete(cb);
+  };
+};
+const emit = () => listeners.forEach((l) => l());
+
+export const fetchTecnologias = async () => {
+  try {
+    const { data, error } = await supabase
+      .from("projeto_tecnologias")
+      .select(`
+        id,
+        projeto_id,
+        quantidade,
+        unidade,
+        familias,
+        municipios,
+        comunidades,
+        data,
+        observacoes,
+        tecnologias_sociais (
+          nome,
+          linha_de_acao_id
+        )
+      `);
+
+    if (error) {
+      console.error("[TecnologiasStore] error fetching from Supabase:", error);
+      return;
+    }
+
+    if (data) {
+      tecnologias = data.map((row: any) => ({
+        id: row.id,
+        categoria: lineIdToCat[row.tecnologias_sociais?.linha_de_acao_id] || "hidrica",
+        nome: row.tecnologias_sociais?.nome || "",
+        quantidade: row.quantidade,
+        unidade: row.unidade,
+        familias: row.familias || undefined,
+        municipios: row.municipios || "",
+        comunidades: row.comunidades || undefined,
+        projetoId: row.projeto_id || undefined,
+        data: row.data || new Date().toISOString().slice(0, 10),
+        observacoes: row.observacoes || undefined,
+      }));
+      emit();
+    }
+  } catch (err) {
+    console.error("[TecnologiasStore] exception during fetch:", err);
+  }
+};
+
+const getOrCreateCatalogTechId = async (nome: string, categoria: CategoriaTec): Promise<string | null> => {
+  const lineId = catToLineId[categoria] || 1;
+  try {
+    const { data } = await supabase
+      .from("tecnologias_sociais")
+      .select("id")
+      .eq("nome", nome)
+      .maybeSingle();
+
+    if (data) return data.id;
+
+    const { data: newTech, error } = await supabase
+      .from("tecnologias_sociais")
+      .insert({
+        nome,
+        linha_de_acao_id: lineId,
+        tipo_entrega: categoria === "formacao" || categoria === "comunicacao" || categoria === "inclusao" ? "Metodológica" : "Física",
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      console.error("[TecnologiasStore] error inserting catalog tech:", error);
+      return null;
+    }
+    return newTech?.id || null;
+  } catch (err) {
+    console.error("[TecnologiasStore] exception in getOrCreateCatalogTechId:", err);
+    return null;
+  }
+};
+
+export const addTecnologia = (t: Omit<Tecnologia, "id">): string => {
+  const id = crypto.randomUUID();
+  tecnologias = [{ ...t, id }, ...tecnologias];
+  emit();
+
+  (async () => {
+    try {
+      const techId = await getOrCreateCatalogTechId(t.nome, t.categoria);
+      if (!techId) return;
+
+      const { error } = await supabase.from("projeto_tecnologias").insert({
+        id,
+        projeto_id: t.projetoId || null,
+        tecnologia_id: techId,
+        quantidade: t.quantidade,
+        unidade: t.unidade,
+        familias: t.familias || null,
+        municipios: t.municipios || null,
+        comunidades: t.comunidades || null,
+        data: t.data || null,
+        observacoes: t.observacoes || null,
+      });
+
+      if (error) {
+        console.error("[TecnologiasStore] error adding technology:", error);
+      }
+      fetchTecnologias();
+    } catch (err) {
+      console.error("[TecnologiasStore] exception in addTecnologia:", err);
+    }
+  })();
+
+  return id;
+};
+
+export const updateTecnologia = (id: string, t: Omit<Tecnologia, "id">) => {
+  tecnologias = tecnologias.map((it) => (it.id === id ? { ...t, id } : it));
+  emit();
+
+  (async () => {
+    try {
+      const techId = await getOrCreateCatalogTechId(t.nome, t.categoria);
+      if (!techId) return;
+
+      const { error } = await supabase
+        .from("projeto_tecnologias")
+        .update({
+          projeto_id: t.projetoId || null,
+          tecnologia_id: techId,
+          quantidade: t.quantidade,
+          unidade: t.unidade,
+          familias: t.familias || null,
+          municipios: t.municipios || null,
+          comunidades: t.comunidades || null,
+          data: t.data || null,
+          observacoes: t.observacoes || null,
+        })
+        .eq("id", id);
+
+      if (error) {
+        console.error("[TecnologiasStore] error updating technology:", error);
+      }
+      fetchTecnologias();
+    } catch (err) {
+      console.error("[TecnologiasStore] exception in updateTecnologia:", err);
+    }
+  })();
+};
+
+export const deleteTecnologia = (id: string) => {
+  tecnologias = tecnologias.filter((it) => it.id !== id);
+  emit();
+
+  (async () => {
+    try {
+      const { error } = await supabase
+        .from("projeto_tecnologias")
+        .delete()
+        .eq("id", id);
+
+      if (error) {
+        console.error("[TecnologiasStore] error deleting technology:", error);
+      }
+      fetchTecnologias();
+    } catch (err) {
+      console.error("[TecnologiasStore] exception in deleteTecnologia:", err);
+    }
+  })();
+};
+
+export const useTecnologias = () => {
+  useEffect(() => {
+    fetchTecnologias();
+  }, []);
+
+  return useSyncExternalStore(
+    subscribe,
+    () => tecnologias,
+    () => tecnologias,
+  );
+};
+
+export const getTotalTecnologias = () =>
+  tecnologias.reduce((acc, t) => acc + (Number(t.quantidade) || 0), 0);
+
+export const useTotalTecnologias = () => {
+  const list = useTecnologias();
+  return list.reduce((acc, t) => acc + (Number(t.quantidade) || 0), 0);
+};

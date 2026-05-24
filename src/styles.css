@@ -1,0 +1,197 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * CHAPADA Design System
+ * Earthy, warm Caatinga/Sertão palette: terracotta, ocre, olive, savanna green.
+ * All colors in oklch.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-glow: var(--primary-glow);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-terracotta: var(--terracotta);
+  --color-terracotta-foreground: var(--terracotta-foreground);
+  --color-ocre: var(--ocre);
+  --color-ocre-foreground: var(--ocre-foreground);
+  --color-savanna: var(--savanna);
+  --color-savanna-foreground: var(--savanna-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --font-display: "Fraunces", Georgia, serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+}
+
+:root {
+  --radius: 0.625rem;
+
+  /* Page background — azul gelo #EAF4FB */
+  --background: oklch(0.965 0.018 235);
+  /* Headings/body base — #1A3A4A */
+  --foreground: oklch(0.32 0.04 230);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.32 0.04 230);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.32 0.04 230);
+
+  /* Azul primário CHAPADA #1A9FD4 */
+  --primary: oklch(0.66 0.13 232);
+  --primary-foreground: oklch(1 0 0);
+  /* Azul escuro hover #1178A8 */
+  --primary-glow: oklch(0.54 0.12 232);
+
+  --secondary: oklch(0.95 0.025 235);
+  --secondary-foreground: oklch(0.32 0.04 230);
+
+  --muted: oklch(0.95 0.02 235);
+  /* Texto corpo #4A6275 */
+  --muted-foreground: oklch(0.48 0.035 240);
+
+  --accent: oklch(0.92 0.035 235);
+  --accent-foreground: oklch(0.32 0.04 230);
+
+  /* "terracotta" reaproveitado como amarelo dourado #F5A623 (destaques/acentos) */
+  --terracotta: oklch(0.76 0.16 75);
+  --terracotta-foreground: oklch(0.25 0.04 60);
+
+  /* "ocre" também mapeado para amarelo dourado para badges */
+  --ocre: oklch(0.76 0.16 75);
+  --ocre-foreground: oklch(0.25 0.04 60);
+
+  /* "savanna" mapeado para verde sucesso #4CAF50 */
+  --savanna: oklch(0.66 0.16 145);
+  --savanna-foreground: oklch(1 0 0);
+
+  --destructive: oklch(0.58 0.22 28);
+  --destructive-foreground: oklch(1 0 0);
+
+  /* Bordas #C4DFF0 */
+  --border: oklch(0.88 0.04 235);
+  --input: oklch(0.9 0.035 235);
+  --ring: oklch(0.66 0.13 232);
+
+  --chart-1: oklch(0.66 0.13 232);  /* azul primário */
+  --chart-2: oklch(0.66 0.16 145);  /* verde sucesso */
+  --chart-3: oklch(0.76 0.16 75);   /* amarelo dourado */
+  --chart-4: oklch(0.54 0.12 232);  /* azul escuro */
+  --chart-5: oklch(0.78 0.09 232);  /* azul claro */
+
+  /* Sidebar — fundo azul #1A9FD4, texto branco */
+  --sidebar: oklch(0.66 0.13 232);
+  --sidebar-foreground: oklch(1 0 0);
+  --sidebar-primary: oklch(0.76 0.16 75);
+  --sidebar-primary-foreground: oklch(0.25 0.04 60);
+  --sidebar-accent: oklch(0.54 0.12 232);
+  --sidebar-accent-foreground: oklch(1 0 0);
+  --sidebar-border: oklch(0.54 0.12 232);
+  --sidebar-ring: oklch(0.76 0.16 75);
+
+  --gradient-warm: linear-gradient(135deg, oklch(0.66 0.13 232), oklch(0.78 0.09 232));
+  --gradient-earth: linear-gradient(180deg, oklch(0.66 0.13 232), oklch(0.54 0.12 232));
+  --shadow-soft: 0 4px 14px -4px oklch(0.54 0.12 232 / 0.2);
+  --shadow-elevated: 0 12px 30px -10px oklch(0.54 0.12 232 / 0.3);
+}
+
+.dark {
+  --background: oklch(0.2 0.02 60);
+  --foreground: oklch(0.95 0.02 80);
+  --card: oklch(0.25 0.025 60);
+  --card-foreground: oklch(0.95 0.02 80);
+  --popover: oklch(0.25 0.025 60);
+  --popover-foreground: oklch(0.95 0.02 80);
+  --primary: oklch(0.62 0.13 130);
+  --primary-foreground: oklch(0.15 0.02 60);
+  --primary-glow: oklch(0.7 0.15 130);
+  --secondary: oklch(0.3 0.03 60);
+  --secondary-foreground: oklch(0.95 0.02 80);
+  --muted: oklch(0.3 0.03 60);
+  --muted-foreground: oklch(0.7 0.03 75);
+  --accent: oklch(0.35 0.04 70);
+  --accent-foreground: oklch(0.95 0.02 80);
+  --terracotta: oklch(0.65 0.17 40);
+  --terracotta-foreground: oklch(0.15 0.02 60);
+  --ocre: oklch(0.78 0.14 75);
+  --ocre-foreground: oklch(0.15 0.02 60);
+  --savanna: oklch(0.6 0.12 145);
+  --savanna-foreground: oklch(0.15 0.02 60);
+  --destructive: oklch(0.65 0.2 28);
+  --destructive-foreground: oklch(0.98 0.01 90);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.62 0.13 130);
+  --chart-1: oklch(0.65 0.17 40);
+  --chart-2: oklch(0.6 0.12 145);
+  --chart-3: oklch(0.78 0.14 75);
+  --chart-4: oklch(0.55 0.08 50);
+  --chart-5: oklch(0.7 0.13 110);
+  --sidebar: oklch(0.18 0.02 60);
+  --sidebar-foreground: oklch(0.95 0.02 80);
+  --sidebar-primary: oklch(0.78 0.14 75);
+  --sidebar-primary-foreground: oklch(0.15 0.02 60);
+  --sidebar-accent: oklch(0.28 0.03 60);
+  --sidebar-accent-foreground: oklch(0.95 0.02 80);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.78 0.14 75);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    background-image:
+      radial-gradient(circle at 20% 0%, oklch(0.66 0.13 232 / 0.06) 0%, transparent 50%),
+      radial-gradient(circle at 100% 100%, oklch(0.76 0.16 75 / 0.05) 0%, transparent 50%);
+    background-attachment: fixed;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+}
