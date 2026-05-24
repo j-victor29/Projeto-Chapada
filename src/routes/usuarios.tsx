@@ -35,11 +35,11 @@ export const Route = createFileRoute("/usuarios")({
 });
 
 const usuarios = [
-  { nome: "Maria Conceição", email: "maria@chapada.org.br", ativo: true, lastSignIn: "2025-04-26T14:32:00" },
-  { nome: "José Pedro Lima", email: "jose.pedro@chapada.org.br", ativo: true, lastSignIn: "2025-04-25T09:15:00" },
-  { nome: "Ana Beatriz Souza", email: "ana@chapada.org.br", ativo: true, lastSignIn: "2025-04-24T17:48:00" },
-  { nome: "Carlos Henrique", email: "carlos@chapada.org.br", ativo: true, lastSignIn: "2025-04-20T11:02:00" },
-  { nome: "Lúcia Ferreira", email: "lucia@chapada.org.br", ativo: false, lastSignIn: null as string | null },
+  { nome: "Maria Conceição", email: "maria@chapada.org.br", ativo: true, role: "admin", lastSignIn: "2025-04-26T14:32:00" },
+  { nome: "José Pedro Lima", email: "jose.pedro@chapada.org.br", ativo: true, role: "editor", lastSignIn: "2025-04-25T09:15:00" },
+  { nome: "Ana Beatriz Souza", email: "ana@chapada.org.br", ativo: true, role: "editor", lastSignIn: "2025-04-24T17:48:00" },
+  { nome: "Carlos Henrique", email: "carlos@chapada.org.br", ativo: true, role: "visualizador", lastSignIn: "2025-04-20T11:02:00" },
+  { nome: "Lúcia Ferreira", email: "lucia@chapada.org.br", ativo: false, role: "visualizador", lastSignIn: null as string | null },
 ];
 
 const formatLastSignIn = (iso: string | null) => {
@@ -101,6 +101,7 @@ function UsuariosPage() {
                 <TableHead>Usuário</TableHead>
                 <TableHead>E-mail</TableHead>
                 <TableHead>Último Acesso</TableHead>
+                <TableHead>Papel</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -132,6 +133,11 @@ function UsuariosPage() {
                     <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
                     <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                       {formatLastSignIn(u.lastSignIn)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="capitalize">
+                        {u.role}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       {u.ativo ? (

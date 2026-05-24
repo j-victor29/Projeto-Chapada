@@ -17,7 +17,10 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndicadoresRouteImport } from './routes/indicadores'
 import { Route as ImagensRouteImport } from './routes/imagens'
 import { Route as EsqueciSenhaRouteImport } from './routes/esqueci-senha'
+import { Route as DocumentosRouteImport } from './routes/documentos'
 import { Route as CriarSenhaRouteImport } from './routes/criar-senha'
+import { Route as CadastrosRouteImport } from './routes/cadastros'
+import { Route as AuditoriaRouteImport } from './routes/auditoria'
 import { Route as AtividadesRouteImport } from './routes/atividades'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -61,9 +64,24 @@ const EsqueciSenhaRoute = EsqueciSenhaRouteImport.update({
   path: '/esqueci-senha',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DocumentosRoute = DocumentosRouteImport.update({
+  id: '/documentos',
+  path: '/documentos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CriarSenhaRoute = CriarSenhaRouteImport.update({
   id: '/criar-senha',
   path: '/criar-senha',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CadastrosRoute = CadastrosRouteImport.update({
+  id: '/cadastros',
+  path: '/cadastros',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuditoriaRoute = AuditoriaRouteImport.update({
+  id: '/auditoria',
+  path: '/auditoria',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AtividadesRoute = AtividadesRouteImport.update({
@@ -80,7 +98,10 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/atividades': typeof AtividadesRoute
+  '/auditoria': typeof AuditoriaRoute
+  '/cadastros': typeof CadastrosRoute
   '/criar-senha': typeof CriarSenhaRoute
+  '/documentos': typeof DocumentosRoute
   '/esqueci-senha': typeof EsqueciSenhaRoute
   '/imagens': typeof ImagensRoute
   '/indicadores': typeof IndicadoresRoute
@@ -93,7 +114,10 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/atividades': typeof AtividadesRoute
+  '/auditoria': typeof AuditoriaRoute
+  '/cadastros': typeof CadastrosRoute
   '/criar-senha': typeof CriarSenhaRoute
+  '/documentos': typeof DocumentosRoute
   '/esqueci-senha': typeof EsqueciSenhaRoute
   '/imagens': typeof ImagensRoute
   '/indicadores': typeof IndicadoresRoute
@@ -107,7 +131,10 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/atividades': typeof AtividadesRoute
+  '/auditoria': typeof AuditoriaRoute
+  '/cadastros': typeof CadastrosRoute
   '/criar-senha': typeof CriarSenhaRoute
+  '/documentos': typeof DocumentosRoute
   '/esqueci-senha': typeof EsqueciSenhaRoute
   '/imagens': typeof ImagensRoute
   '/indicadores': typeof IndicadoresRoute
@@ -122,7 +149,10 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/atividades'
+    | '/auditoria'
+    | '/cadastros'
     | '/criar-senha'
+    | '/documentos'
     | '/esqueci-senha'
     | '/imagens'
     | '/indicadores'
@@ -135,7 +165,10 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/atividades'
+    | '/auditoria'
+    | '/cadastros'
     | '/criar-senha'
+    | '/documentos'
     | '/esqueci-senha'
     | '/imagens'
     | '/indicadores'
@@ -148,7 +181,10 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/atividades'
+    | '/auditoria'
+    | '/cadastros'
     | '/criar-senha'
+    | '/documentos'
     | '/esqueci-senha'
     | '/imagens'
     | '/indicadores'
@@ -162,7 +198,10 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AtividadesRoute: typeof AtividadesRoute
+  AuditoriaRoute: typeof AuditoriaRoute
+  CadastrosRoute: typeof CadastrosRoute
   CriarSenhaRoute: typeof CriarSenhaRoute
+  DocumentosRoute: typeof DocumentosRoute
   EsqueciSenhaRoute: typeof EsqueciSenhaRoute
   ImagensRoute: typeof ImagensRoute
   IndicadoresRoute: typeof IndicadoresRoute
@@ -231,11 +270,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EsqueciSenhaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/documentos': {
+      id: '/documentos'
+      path: '/documentos'
+      fullPath: '/documentos'
+      preLoaderRoute: typeof DocumentosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/criar-senha': {
       id: '/criar-senha'
       path: '/criar-senha'
       fullPath: '/criar-senha'
       preLoaderRoute: typeof CriarSenhaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cadastros': {
+      id: '/cadastros'
+      path: '/cadastros'
+      fullPath: '/cadastros'
+      preLoaderRoute: typeof CadastrosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auditoria': {
+      id: '/auditoria'
+      path: '/auditoria'
+      fullPath: '/auditoria'
+      preLoaderRoute: typeof AuditoriaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/atividades': {
@@ -258,7 +318,10 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AtividadesRoute: AtividadesRoute,
+  AuditoriaRoute: AuditoriaRoute,
+  CadastrosRoute: CadastrosRoute,
   CriarSenhaRoute: CriarSenhaRoute,
+  DocumentosRoute: DocumentosRoute,
   EsqueciSenhaRoute: EsqueciSenhaRoute,
   ImagensRoute: ImagensRoute,
   IndicadoresRoute: IndicadoresRoute,

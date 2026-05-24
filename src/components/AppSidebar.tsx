@@ -7,12 +7,17 @@ import {
   BarChart3,
   Users,
   Sprout,
+  FileText,
+  Database,
+  ShieldAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import chapadaLogo from "@/assets/chapada-logo.png";
+import { useAuth } from "@/contexts/AuthContext";
+import { useProfile } from "@/lib/profileStore";
 
 type NavItem = {
-  to: "/" | "/projetos" | "/atividades" | "/imagens" | "/indicadores" | "/tecnologias" | "/usuarios";
+  to: "/" | "/projetos" | "/atividades" | "/imagens" | "/indicadores" | "/tecnologias" | "/usuarios" | "/documentos" | "/cadastros" | "/auditoria";
   label: string;
   icon: typeof LayoutDashboard;
   exact?: boolean;
@@ -25,11 +30,23 @@ const nav: NavItem[] = [
   { to: "/imagens", label: "Banco de Imagens", icon: Images },
   { to: "/indicadores", label: "Indicadores", icon: BarChart3 },
   { to: "/tecnologias", label: "Tecnologias Sociais", icon: Sprout },
+  { to: "/documentos", label: "Documentos", icon: FileText },
+  { to: "/cadastros", label: "Cadastros", icon: Database },
   { to: "/usuarios", label: "Usuários", icon: Users },
+  { to: "/auditoria", label: "Auditoria", icon: ShieldAlert },
 ];
 
 export function AppSidebar() {
   const { pathname } = useLocation();
+  const { user } = useAuth();
+  const profile = useProfile(user?.email);
+  const isAdmin = profile?.role === "admin";
+
+  const visibleNav = nav.filter(item => {
+    if (item.to === "/auditoria") return isAdmin;
+    if (item.to === "/usuarios") return isAdmin;
+    return true;
+  });
 
   return (
     <aside className="hidden md:flex w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
@@ -50,7 +67,7 @@ export function AppSidebar() {
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {nav.map((item) => {
+        {visibleNav.map((item) => {
           const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
           const Icon = item.icon;
           return (
