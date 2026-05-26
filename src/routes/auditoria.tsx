@@ -164,8 +164,8 @@ function AuditoriaPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todas as tabelas</SelectItem>
-              {TABELAS.map((t) => (
-                <SelectItem key={t} value={t}>{t}</SelectItem>
+              {TABELAS?.filter(t => t && String(t).trim() !== "").map((t) => (
+                <SelectItem key={t} value={String(t)}>{t}</SelectItem>
               ))}
             </SelectContent>
           </Select>

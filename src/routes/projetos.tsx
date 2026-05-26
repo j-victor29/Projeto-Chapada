@@ -225,18 +225,22 @@ function ProjetosPage() {
               <div>
                 <Label>Instituição Financiadora</Label>
                 <Select
-                  value={editing.financiador}
+                  value={editing.financiador || undefined}
                   onValueChange={(v) => setEditing({ ...editing, financiador: v })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
-                    {FINANCIADORES.map((f) => (
-                      <SelectItem key={f} value={f}>
-                        {f}
-                      </SelectItem>
-                    ))}
+                    {FINANCIADORES.length > 0 ? (
+                      FINANCIADORES?.filter(f => f && String(f).trim() !== "").map((f) => (
+                        <SelectItem key={f} value={String(f)}>
+                          {f}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="none" disabled>Nenhum financiador</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -365,8 +369,8 @@ function ProjetosPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os financiadores</SelectItem>
-              {FINANCIADORES.map((f) => (
-                <SelectItem key={f} value={f}>
+              {FINANCIADORES?.filter(f => f && String(f).trim() !== "").map((f) => (
+                <SelectItem key={f} value={String(f)}>
                   {f}
                 </SelectItem>
               ))}
@@ -378,8 +382,8 @@ function ProjetosPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os municípios</SelectItem>
-              {MUNICIPIOS.map((m) => (
-                <SelectItem key={m} value={m}>
+              {MUNICIPIOS?.filter(m => m && String(m).trim() !== "").map((m) => (
+                <SelectItem key={m} value={String(m)}>
                   {m}
                 </SelectItem>
               ))}
@@ -391,8 +395,8 @@ function ProjetosPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os status</SelectItem>
-              {STATUS.map((s) => (
-                <SelectItem key={s} value={s}>
+              {STATUS?.filter(s => s && String(s).trim() !== "").map((s) => (
+                <SelectItem key={s} value={String(s)}>
                   {s}
                 </SelectItem>
               ))}

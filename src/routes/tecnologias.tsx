@@ -380,16 +380,20 @@ function TecnologiaModal({
 
           <div className="md:col-span-2 space-y-1.5">
             <Label>Nome da tecnologia</Label>
-            <Select value={nome} onValueChange={setNome}>
+            <Select value={nome || undefined} onValueChange={setNome}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione a tecnologia" />
               </SelectTrigger>
               <SelectContent>
-                {meta.exemplos.map((ex) => (
-                  <SelectItem key={ex} value={ex}>
-                    {ex}
-                  </SelectItem>
-                ))}
+                {meta.exemplos.length > 0 ? (
+                  meta.exemplos?.filter(ex => ex && String(ex).trim() !== "").map((ex) => (
+                    <SelectItem key={ex} value={String(ex)}>
+                      {ex}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="none" disabled>Nenhum exemplo</SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -433,16 +437,20 @@ function TecnologiaModal({
 
           <div className="space-y-1.5">
             <Label>Projeto vinculado</Label>
-            <Select value={projetoId} onValueChange={setProjetoId}>
+            <Select value={projetoId || undefined} onValueChange={setProjetoId}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
               <SelectContent>
-                {projetos.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.nome}
-                  </SelectItem>
-                ))}
+                {projetos.length > 0 ? (
+                  projetos?.filter(p => p.id && String(p.id).trim() !== "").map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)}>
+                      {p.nome}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="none" disabled>Nenhum projeto</SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>

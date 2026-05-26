@@ -444,16 +444,20 @@ function AtividadesPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label>Projeto *</Label>
-              <Select value={form.projetoId} onValueChange={setF("projetoId")}>
+              <Select value={form.projetoId || undefined} onValueChange={setF("projetoId")}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  {projetos.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.nome}
-                    </SelectItem>
-                  ))}
+                  {projetos.length > 0 ? (
+                    projetos?.filter(p => p.id && String(p.id).trim() !== "").map((p) => (
+                      <SelectItem key={p.id} value={String(p.id)}>
+                        {p.nome}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>Nenhum projeto</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -467,31 +471,39 @@ function AtividadesPage() {
             </div>
             <div>
               <Label>Tipo de Ação *</Label>
-              <Select value={form.tipo} onValueChange={setF("tipo")}>
+              <Select value={form.tipo || undefined} onValueChange={setF("tipo")}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  {TIPOS.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {t}
-                    </SelectItem>
-                  ))}
+                  {TIPOS.length > 0 ? (
+                    TIPOS?.filter(t => t && String(t).trim() !== "").map((t) => (
+                      <SelectItem key={t} value={String(t)}>
+                        {t}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>Nenhum tipo</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label>Município</Label>
-              <Select value={form.municipio} onValueChange={setF("municipio")}>
+              <Select value={form.municipio || undefined} onValueChange={setF("municipio")}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  {MUNICIPIOS.map((m) => (
-                    <SelectItem key={m} value={m}>
-                      {m}
-                    </SelectItem>
-                  ))}
+                  {MUNICIPIOS.length > 0 ? (
+                    MUNICIPIOS?.filter(m => m && String(m).trim() !== "").map((m) => (
+                      <SelectItem key={m} value={String(m)}>
+                        {m}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>Nenhum município</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>

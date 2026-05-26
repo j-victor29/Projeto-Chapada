@@ -156,7 +156,7 @@ function DocumentosPage() {
       await addDocumento({
         file: pendingFile,
         projetoId: form.projetoId || undefined,
-        categoriaId: undefined, // usaremos categoria como texto até ter FK funcional
+        categoria: form.categoria || undefined,
         tags,
         documentoPaiId: form.documentoPaiId || undefined,
       });
@@ -234,8 +234,8 @@ function DocumentosPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todas as categorias</SelectItem>
-              {CATEGORIAS_PADRAO.map((c) => (
-                <SelectItem key={c} value={c}>{c}</SelectItem>
+              {CATEGORIAS_PADRAO?.filter(c => c && String(c).trim() !== "").map((c) => (
+                <SelectItem key={c} value={String(c)}>{c}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -245,8 +245,8 @@ function DocumentosPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os projetos</SelectItem>
-              {projetos.map((p) => (
-                <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
+              {projetos?.filter(p => p.id && String(p.id).trim() !== "").map((p) => (
+                <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -410,8 +410,8 @@ function DocumentosPage() {
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORIAS_PADRAO.map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  {CATEGORIAS_PADRAO?.filter(c => c && String(c).trim() !== "").map((c) => (
+                    <SelectItem key={c} value={String(c)}>{c}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -424,9 +424,8 @@ function DocumentosPage() {
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhum</SelectItem>
-                  {projetos.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
+                  {projetos?.filter(p => p.id && String(p.id).trim() !== "").map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

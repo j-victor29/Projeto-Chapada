@@ -388,8 +388,8 @@ function ImagensPage() {
                   <SelectValue placeholder="Selecione (opcional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  {projetos.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
+                  {projetos?.filter(p => p.id && String(p.id).trim() !== "").map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)}>
                       {p.nome}
                     </SelectItem>
                   ))}
@@ -406,8 +406,8 @@ function ImagensPage() {
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  {MUNICIPIOS.map((m) => (
-                    <SelectItem key={m} value={m}>
+                  {MUNICIPIOS?.filter(m => m && String(m).trim() !== "").map((m) => (
+                    <SelectItem key={m} value={String(m)}>
                       {m}
                     </SelectItem>
                   ))}
@@ -424,8 +424,8 @@ function ImagensPage() {
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  {TIPOS.map((t) => (
-                    <SelectItem key={t} value={t}>
+                  {TIPOS?.filter(t => t && String(t).trim() !== "").map((t) => (
+                    <SelectItem key={t} value={String(t)}>
                       {t}
                     </SelectItem>
                   ))}
