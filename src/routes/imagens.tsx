@@ -51,7 +51,7 @@ import {
   type ImagemItem,
 } from "@/lib/imagensStore";
 import { useProjetos } from "@/lib/projetosStore";
-import { MUNICIPIOS } from "@/lib/mockData";
+import { Municipios } from "@/lib/cadastrosStore";
 import { addNotification } from "@/lib/notificationsStore";
 import { useGlobalSearch } from "@/contexts/SearchContext";
 import {
@@ -92,6 +92,7 @@ const emptyForm = { projetoId: "", projetoNome: "", local: "", tipo: "", date: "
 
 function ImagensPage() {
   const imgs = useImagens();
+  const { data: dbMunicipios = [] } = Municipios.useList();
   const categorias = useCategorias();
   const projetos = useProjetos();
   const { query } = useGlobalSearch();
@@ -477,9 +478,9 @@ function ImagensPage() {
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  {MUNICIPIOS?.filter(m => m && String(m).trim() !== "").map((m) => (
-                    <SelectItem key={m} value={String(m)}>
-                      {m}
+                  {dbMunicipios.map((m) => (
+                    <SelectItem key={m.id} value={m.nome}>
+                      {m.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>

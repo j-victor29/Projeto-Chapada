@@ -7,6 +7,7 @@ export interface ProjetoDB {
   nome: string;
   contrato: string;
   financiador: string;
+  financiadorId?: string | null;
   inicio: string; // ISO date
   termino: string;
   valor: number;
@@ -38,6 +39,7 @@ function rowToProjeto(row: any): ProjetoDB {
     nome: row.nome ?? "",
     contrato: row.contrato ?? "",
     financiador: row.financiador ?? "",
+    financiadorId: row.financiador_id ?? null,
     inicio: row.inicio ?? "",
     termino: row.termino ?? "",
     valor: Number(row.valor ?? 0),
@@ -47,6 +49,33 @@ function rowToProjeto(row: any): ProjetoDB {
     status: (row.status as ProjetoStatus) ?? "Em execução",
   };
 }
+
+// Helper to sync pivot table projeto_municipios
+const syncProjetoMunicipios = async (projetoId: string, municipios: string[]) => {
+  try {
+    // 1. Delete existing associations
+    await supabase.from("projeto_municipios").delete().eq("projeto_id", projetoId);
+
+    if (!municipios || municipios.length === 0) return;
+
+    // 2. Fetch UUIDs for selected municipio names
+    const { data: dbMuns } = await supabase
+      .from("municipios")
+      .select("id, nome")
+      .in("nome", municipios);
+
+    if (dbMuns && dbMuns.length > 0) {
+      // 3. Insert associations
+      const inserts = dbMuns.map((m) => ({
+        projeto_id: projetoId,
+        municipio_id: m.id,
+      }));
+      await supabase.from("projeto_municipios").insert(inserts);
+    }
+  } catch (err) {
+    console.error("[projetosStore] Error syncing project municipios:", err);
+  }
+};
 
 // ─── Initialize ───────────────────────────────────────────────────────────────
 export const initProjetos = async () => {
@@ -78,6 +107,7 @@ export const addProjeto = async (
       nome: p.nome,
       contrato: p.contrato,
       financiador: p.financiador,
+      financiador_id: p.financiadorId || null,
       inicio: p.inicio,
       termino: p.termino,
       valor: p.valor,
@@ -95,6 +125,7 @@ export const addProjeto = async (
   }
 
   const novo = rowToProjeto(data);
+  await syncProjetoMunicipios(novo.id, p.municipios);
   projetos = [novo, ...projetos];
   emit();
   return novo;
@@ -109,6 +140,8 @@ export const updateProjeto = async (
   if (patch.contrato !== undefined) updatePayload.contrato = patch.contrato;
   if (patch.financiador !== undefined)
     updatePayload.financiador = patch.financiador;
+  if (patch.financiadorId !== undefined)
+    updatePayload.financiador_id = patch.financiadorId || null;
   if (patch.inicio !== undefined) updatePayload.inicio = patch.inicio;
   if (patch.termino !== undefined) updatePayload.termino = patch.termino;
   if (patch.valor !== undefined) updatePayload.valor = patch.valor;
@@ -128,6 +161,10 @@ export const updateProjeto = async (
   if (error) {
     console.error("[projetosStore] update error:", error);
     throw error;
+  }
+
+  if (patch.municipios !== undefined) {
+    await syncProjetoMunicipios(id, patch.municipios);
   }
 
   projetos = projetos.map((p) =>

@@ -44,12 +44,11 @@ import { Plus, Pencil, Trash2, Search } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
-  FINANCIADORES,
-  MUNICIPIOS,
   formatBRL,
   formatDate,
   type ProjetoStatus,
 } from "@/lib/mockData";
+import { Financiadores, Municipios } from "@/lib/cadastrosStore";
 import { calcVigenciaProgress } from "@/lib/progress";
 import { toast } from "sonner";
 import { useGlobalSearch } from "@/contexts/SearchContext";
@@ -108,6 +107,8 @@ type EditingState = Omit<ProjetoDB, "id"> & { id?: string };
 
 function ProjetosPage() {
   const projetos = useProjetos();
+  const { data: dbFinanciadores = [] } = Financiadores.useList();
+  const { data: dbMunicipios = [] } = Municipios.useList();
   const [search, setSearch] = useState("");
   const { query: globalQuery } = useGlobalSearch();
   const { email: currentEmail, name: currentName } = useCurrentUser();
@@ -225,17 +226,24 @@ function ProjetosPage() {
               <div>
                 <Label>Instituição Financiadora</Label>
                 <Select
-                  value={editing.financiador || undefined}
-                  onValueChange={(v) => setEditing({ ...editing, financiador: v })}
+                  value={editing.financiadorId || undefined}
+                  onValueChange={(v) => {
+                    const selectedFin = dbFinanciadores.find((f) => f.id === v);
+                    setEditing({
+                      ...editing,
+                      financiadorId: v,
+                      financiador: selectedFin?.nome ?? "",
+                    });
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
-                    {FINANCIADORES.length > 0 ? (
-                      FINANCIADORES?.filter(f => f && String(f).trim() !== "").map((f) => (
-                        <SelectItem key={f} value={String(f)}>
-                          {f}
+                    {dbFinanciadores.length > 0 ? (
+                      dbFinanciadores.map((f) => (
+                        <SelectItem key={f.id} value={f.id}>
+                          {f.nome}
                         </SelectItem>
                       ))
                     ) : (
@@ -291,20 +299,20 @@ function ProjetosPage() {
               <div className="md:col-span-2">
                 <Label>Municípios / Comunidades Atendidos</Label>
                 <div className="flex flex-wrap gap-2 mt-2">
-                  {MUNICIPIOS.map((m) => {
-                    const sel = editing.municipios.includes(m);
+                  {dbMunicipios.map((m) => {
+                    const sel = editing.municipios.includes(m.nome);
                     return (
                       <button
-                        key={m}
+                        key={m.id}
                         type="button"
-                        onClick={() => toggleMun(m)}
+                        onClick={() => toggleMun(m.nome)}
                         className={`px-3 py-1 rounded-full text-xs border transition-colors ${
                           sel
                             ? "bg-primary text-primary-foreground border-primary"
                             : "bg-background hover:bg-accent border-border"
                         }`}
                       >
-                        {m}
+                        {m.nome}
                       </button>
                     );
                   })}
@@ -369,9 +377,9 @@ function ProjetosPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os financiadores</SelectItem>
-              {FINANCIADORES?.filter(f => f && String(f).trim() !== "").map((f) => (
-                <SelectItem key={f} value={String(f)}>
-                  {f}
+              {dbFinanciadores.map((f) => (
+                <SelectItem key={f.id} value={f.nome}>
+                  {f.nome}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -382,9 +390,9 @@ function ProjetosPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os municípios</SelectItem>
-              {MUNICIPIOS?.filter(m => m && String(m).trim() !== "").map((m) => (
-                <SelectItem key={m} value={String(m)}>
-                  {m}
+              {dbMunicipios.map((m) => (
+                <SelectItem key={m.id} value={m.nome}>
+                  {m.nome}
                 </SelectItem>
               ))}
             </SelectContent>

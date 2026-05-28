@@ -43,7 +43,8 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react";
-import { formatDate, MUNICIPIOS } from "@/lib/mockData";
+import { formatDate } from "@/lib/mockData";
+import { Municipios } from "@/lib/cadastrosStore";
 import {
   addAtividade,
   deleteAtividade,
@@ -131,6 +132,7 @@ const toFormState = (a: AtividadeFull): FormState => ({
 
 function AtividadesPage() {
   const ordenadas = useAtividades();
+  const { data: dbMunicipios = [] } = Municipios.useList();
   const projetos = useProjetos();
   const { query } = useGlobalSearch();
   const [visible, setVisible] = useState(PAGE_SIZE);
@@ -495,10 +497,10 @@ function AtividadesPage() {
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  {MUNICIPIOS.length > 0 ? (
-                    MUNICIPIOS?.filter(m => m && String(m).trim() !== "").map((m) => (
-                      <SelectItem key={m} value={String(m)}>
-                        {m}
+                  {dbMunicipios.length > 0 ? (
+                    dbMunicipios.map((m) => (
+                      <SelectItem key={m.id} value={m.nome}>
+                        {m.nome}
                       </SelectItem>
                     ))
                   ) : (

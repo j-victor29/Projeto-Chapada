@@ -56,6 +56,8 @@ import { useCurrentUser } from "@/lib/useCurrentUser";
 import { CollaboratorsSection } from "@/components/CollaboratorsSection";
 import { addNotification } from "@/lib/notificationsStore";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/tecnologias")({
   head: () => ({
@@ -261,6 +263,18 @@ function TecnologiasPage() {
   );
 }
 
+const catToLineId: Record<string, number> = {
+  hidrica: 1,
+  saneamento: 2,
+  energia: 3,
+  agroecologia: 4,
+  alimentacao: 5,
+  inclusao: 6,
+  formacao: 7,
+  ambiente: 8,
+  comunicacao: 9,
+};
+
 function TecnologiaModal({
   open,
   onOpenChange,
@@ -278,6 +292,17 @@ function TecnologiaModal({
   currentEmail: string;
   currentName: string;
 }) {
+  const { data: dbCatalog = [] } = useQuery({
+    queryKey: ["tecnologias_sociais_catalog"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tecnologias_sociais")
+        .select("id, nome, linha_de_acao_id");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   const [categoria, setCategoria] = useState<CategoriaTec>(initialCategoria);
   const [nome, setNome] = useState("");
   const [quantidade, setQuantidade] = useState("");
@@ -289,6 +314,12 @@ function TecnologiaModal({
   const [data, setData] = useState(new Date().toISOString().slice(0, 10));
   const [observacoes, setObservacoes] = useState("");
   const editingOwnership = useOwnership("tecnologia", editing?.id ?? "");
+
+  const activeLineId = catToLineId[categoria] || 1;
+  const filteredCatalog = dbCatalog.filter((x) => x.linha_de_acao_id === activeLineId);
+  const dropdownOptions = filteredCatalog.length > 0
+    ? filteredCatalog.map((x) => x.nome)
+    : CATEGORIAS[categoria].exemplos;
 
   useEffect(() => {
     if (!open) return;
@@ -385,14 +416,14 @@ function TecnologiaModal({
                 <SelectValue placeholder="Selecione a tecnologia" />
               </SelectTrigger>
               <SelectContent>
-                {meta.exemplos.length > 0 ? (
-                  meta.exemplos?.filter(ex => ex && String(ex).trim() !== "").map((ex) => (
+                {dropdownOptions.length > 0 ? (
+                  dropdownOptions.filter(ex => ex && String(ex).trim() !== "").map((ex) => (
                     <SelectItem key={ex} value={String(ex)}>
                       {ex}
                     </SelectItem>
                   ))
                 ) : (
-                  <SelectItem value="none" disabled>Nenhum exemplo</SelectItem>
+                  <SelectItem value="none" disabled>Nenhuma tecnologia disponível</SelectItem>
                 )}
               </SelectContent>
             </Select>

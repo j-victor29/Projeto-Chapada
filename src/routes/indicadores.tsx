@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useRef } from "react";
+import { useRef, useMemo } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,27 +21,12 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
+import { useAtividades, useAtividadesIndicadores, useAtividadesIndependentes } from "@/lib/atividadesStore";
 
 export const Route = createFileRoute("/indicadores")({
   head: () => ({ meta: [{ title: "Indicadores — CHAPADA" }] }),
   component: IndicadoresPage,
 });
-
-const baselines = {
-  Mulheres: 640,
-  Jovens: 380,
-  Quilombolas: 180,
-  "Povos Originários": 95,
-  "Comunidades Tradicionais": 220,
-};
-
-const porMunicipio = [
-  { name: "Araripina", value: 320 },
-  { name: "Ouricuri", value: 240 },
-  { name: "Trindade", value: 180 },
-  { name: "Bodocó", value: 150 },
-  { name: "Outros", value: 230 },
-];
 
 const COLORS = [
   "oklch(0.6 0.16 40)",
@@ -76,23 +61,49 @@ async function chartToPng(node: HTMLElement | null): Promise<string | null> {
   return canvas.toDataURL("image/png");
 }
 
-import { useAtividadesIndicadores } from "@/lib/atividadesStore";
-
 function IndicadoresPage() {
   const barRef = useRef<HTMLDivElement>(null);
   const pieRef = useRef<HTMLDivElement>(null);
-  
+
+  // Aggregate indicators from both linked and independent activities
+  const atividadesVinculadas = useAtividades();
+  const atividadesIndependentes = useAtividadesIndependentes();
   const ind = useAtividadesIndicadores();
 
+  // Geographic distribution: group activities by municipio
+  const porMunicipio = useMemo(() => {
+    const allAtividades = [...atividadesVinculadas, ...atividadesIndependentes];
+    const map: Record<string, number> = {};
+    allAtividades.forEach((a) => {
+      const mun = a.municipio?.trim() || "Não informado";
+      const participantes = a.indicadores?.participantes ?? 0;
+      map[mun] = (map[mun] ?? 0) + participantes;
+    });
+
+    const entries = Object.entries(map)
+      .filter(([, v]) => v > 0)
+      .sort(([, a], [, b]) => b - a);
+
+    // Keep top 4 + "Outros"
+    if (entries.length <= 5) {
+      return entries.map(([name, value]) => ({ name, value }));
+    }
+    const top4 = entries.slice(0, 4);
+    const outros = entries.slice(4).reduce((acc, [, v]) => acc + v, 0);
+    return [...top4.map(([name, value]) => ({ name, value })), { name: "Outros", value: outros }];
+  }, [atividadesVinculadas, atividadesIndependentes]);
+
+  // Beneficiarios bar chart: only real aggregated values from DB
   const beneficiarios = [
-    { grupo: "Mulheres", total: baselines.Mulheres + ind.mulheres },
-    { grupo: "Jovens", total: baselines.Jovens + ind.jovens },
-    { grupo: "Quilombolas", total: baselines.Quilombolas + ind.quilombolas },
-    { grupo: "Povos Originários", total: baselines["Povos Originários"] + ind.povosOriginarios },
-    { grupo: "Comunidades Tradicionais", total: baselines["Comunidades Tradicionais"] + ind.comunidadesTradicionais },
+    { grupo: "Participantes", total: ind.participantes },
+    { grupo: "Mulheres", total: ind.mulheres },
+    { grupo: "Jovens", total: ind.jovens },
+    { grupo: "Quilombolas", total: ind.quilombolas },
+    { grupo: "Povos Originários", total: ind.povosOriginarios },
+    { grupo: "Com. Tradicionais", total: ind.comunidadesTradicionais },
   ];
 
-  const totalBeneficiarios = beneficiarios.reduce((a, b) => a + b.total, 0);
+  const totalBeneficiarios = ind.participantes;
 
   const exportPDF = async () => {
     try {
@@ -138,7 +149,7 @@ function IndicadoresPage() {
         head: [["Grupo", "Total"]],
         body: [
           ...beneficiarios.map((b) => [b.grupo, b.total.toLocaleString("pt-BR")]),
-          ["TOTAL", totalBeneficiarios.toLocaleString("pt-BR")],
+          ["TOTAL PARTICIPANTES", totalBeneficiarios.toLocaleString("pt-BR")],
         ],
         theme: "striped",
         headStyles: { fillColor: [26, 159, 212] },
@@ -157,11 +168,11 @@ function IndicadoresPage() {
       const wb = XLSX.utils.book_new();
       const s1 = XLSX.utils.json_to_sheet(beneficiarios.map((b) => ({ Grupo: b.grupo, Total: b.total })));
       XLSX.utils.book_append_sheet(wb, s1, "Beneficiários por Grupo");
-      const s2 = XLSX.utils.json_to_sheet(porMunicipio.map((m) => ({ Município: m.name, Total: m.value })));
+      const s2 = XLSX.utils.json_to_sheet(porMunicipio.map((m) => ({ Município: m.name, Participantes: m.value })));
       XLSX.utils.book_append_sheet(wb, s2, "Distribuição por Município");
       const s3 = XLSX.utils.json_to_sheet([
         ...beneficiarios.map((b) => ({ Indicador: b.grupo, Valor: b.total })),
-        { Indicador: "TOTAL", Valor: totalBeneficiarios },
+        { Indicador: "TOTAL PARTICIPANTES", Valor: totalBeneficiarios },
         { Indicador: "Data de Geração", Valor: new Date().toLocaleDateString("pt-BR") },
       ]);
       XLSX.utils.book_append_sheet(wb, s3, "Resumo Consolidado");
@@ -192,30 +203,42 @@ function IndicadoresPage() {
         <Card>
           <CardHeader><CardTitle className="text-base">Beneficiários por Grupo</CardTitle></CardHeader>
           <CardContent className="h-80" ref={barRef}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={beneficiarios}>
-                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.88 0.025 75)" />
-                <XAxis dataKey="grupo" stroke="oklch(0.5 0.03 60)" fontSize={11} />
-                <YAxis stroke="oklch(0.5 0.03 60)" fontSize={12} />
-                <Tooltip contentStyle={{ backgroundColor: "oklch(1 0 0)", border: "1px solid oklch(0.88 0.025 75)", borderRadius: "8px" }} />
-                <Bar dataKey="total" fill="oklch(0.6 0.16 40)" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {beneficiarios.every((b) => b.total === 0) ? (
+              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                Nenhum indicador registrado ainda. Preencha os indicadores nas atividades.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={beneficiarios}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.88 0.025 75)" />
+                  <XAxis dataKey="grupo" stroke="oklch(0.5 0.03 60)" fontSize={11} />
+                  <YAxis stroke="oklch(0.5 0.03 60)" fontSize={12} allowDecimals={false} />
+                  <Tooltip contentStyle={{ backgroundColor: "oklch(1 0 0)", border: "1px solid oklch(0.88 0.025 75)", borderRadius: "8px" }} />
+                  <Bar dataKey="total" fill="oklch(0.6 0.16 40)" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader><CardTitle className="text-base">Distribuição por Município</CardTitle></CardHeader>
           <CardContent className="h-80" ref={pieRef}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={porMunicipio} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
-                  {porMunicipio.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                </Pie>
-                <Legend />
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+            {porMunicipio.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                Nenhuma atividade com município e participantes registrados.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={porMunicipio} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+                    {porMunicipio.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  </Pie>
+                  <Legend />
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -223,10 +246,12 @@ function IndicadoresPage() {
       <Card className="mt-4">
         <CardHeader><CardTitle className="text-base">Resumo Consolidado</CardTitle></CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {beneficiarios.map((b) => (
               <div key={b.grupo} className="text-center p-4 bg-muted/40 rounded-lg">
-                <div className="text-2xl font-display font-semibold text-primary">{b.total}</div>
+                <div className="text-2xl font-display font-semibold text-primary">
+                  {b.total.toLocaleString("pt-BR")}
+                </div>
                 <div className="text-xs text-muted-foreground mt-1">{b.grupo}</div>
               </div>
             ))}

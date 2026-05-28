@@ -129,6 +129,8 @@ export const addAtividade = async (
       local: a.local || null,
       municipio: a.municipio || null,
       responsaveis: a.responsaveis || null,
+      indicadores: a.indicadores || null,
+      anexos: a.anexos || null,
     })
     .select()
     .single();
@@ -162,6 +164,10 @@ export const updateAtividade = async (
   if (patch.municipio !== undefined) updatePayload.municipio = patch.municipio;
   if (patch.responsaveis !== undefined)
     updatePayload.responsaveis = patch.responsaveis;
+  if (patch.indicadores !== undefined)
+    updatePayload.indicadores = patch.indicadores || null;
+  if (patch.anexos !== undefined)
+    updatePayload.anexos = patch.anexos || null;
 
   const { error } = await supabase
     .from("atividades")
