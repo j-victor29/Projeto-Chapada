@@ -19,6 +19,7 @@ import {
   setProfile,
   type UserProfile,
 } from "@/lib/profileStore";
+import { supabase } from "@/integrations/supabase/client";
 
 export type ProfileModalMode = "profile" | "password";
 
@@ -89,19 +90,23 @@ export function ProfileModal({
     onOpenChange(false);
   };
 
-  const savePassword = () => {
-    const stored = getProfile(email)?.password;
-    if (stored && currentPwd !== stored) {
-      toast.error("Senha atual incorreta.");
-      return;
-    }
+  const savePassword = async () => {
     if (!pwdMatch) {
       toast.error("Nova senha inválida ou não confere.");
       return;
     }
-    setProfile(email, { password: newPwd });
-    toast.success("✅ Senha alterada com sucesso!");
-    onOpenChange(false);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPwd });
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      toast.success("✅ Senha alterada com sucesso!");
+      onOpenChange(false);
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao atualizar a senha. Tente novamente.");
+    }
   };
 
   return (

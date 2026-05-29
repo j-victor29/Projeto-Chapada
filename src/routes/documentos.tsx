@@ -72,10 +72,10 @@ function getFileIcon(mimeType?: string | null, titulo?: string) {
   return "📎";
 }
 
-function CardListSkeleton() {
+function CardListSkeleton({ count = 4 }: { count?: number }) {
   return (
     <div className="space-y-3.5">
-      {[1, 2, 3, 4].map((i) => (
+      {Array.from({ length: count }).map((_, i) => (
         <Card key={i} className="border border-muted/80 bg-card rounded-xl overflow-hidden animate-pulse">
           <CardContent className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center gap-4">
             <div className="flex-1 space-y-2">

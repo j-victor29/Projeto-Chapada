@@ -21,6 +21,9 @@ export type Database = {
           full_name: string | null
           id: string
           updated_at: string
+          photo_url: string | null
+          role: string | null
+          cargo: string | null
         }
         Insert: {
           created_at?: string
@@ -28,6 +31,9 @@ export type Database = {
           full_name?: string | null
           id: string
           updated_at?: string
+          photo_url?: string | null
+          role?: string | null
+          cargo?: string | null
         }
         Update: {
           created_at?: string
@@ -35,8 +41,18 @@ export type Database = {
           full_name?: string | null
           id?: string
           updated_at?: string
+          photo_url?: string | null
+          role?: string | null
+          cargo?: string | null
         }
         Relationships: []
+      }
+    } & {
+      [key: string]: {
+        Row: Record<string, any>
+        Insert: Record<string, any>
+        Update: Record<string, any>
+        Relationships: any[]
       }
     }
     Views: {
