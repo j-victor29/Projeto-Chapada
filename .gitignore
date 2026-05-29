@@ -16,6 +16,9 @@ dist-ssr
 .nitro
 *.local
 
+# Bun binary lockfile (use package-lock.json for CI/CD compatibility)
+bun.lockb
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
