@@ -595,8 +595,8 @@ function ProjetosPage() {
                         </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button size="icon" variant="ghost">
-                              <Trash2 className="h-4 w-4 text-destructive" />
+                            <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive">
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
@@ -609,7 +609,7 @@ function ProjetosPage() {
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => remove(p.id)}>
+                              <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => remove(p.id)}>
                                 Remover
                               </AlertDialogAction>
                             </AlertDialogFooter>

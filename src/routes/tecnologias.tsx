@@ -57,7 +57,7 @@ import { useCurrentUser } from "@/lib/useCurrentUser";
 import { CollaboratorsSection } from "@/components/CollaboratorsSection";
 import { addNotification } from "@/lib/notificationsStore";
 import { toast } from "sonner";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/tecnologias")({
@@ -74,6 +74,7 @@ function TecnologiasPage() {
   const [initialCat, setInitialCat] = useState<CategoriaTec>("hidrica");
   const [editing, setEditing] = useState<Tecnologia | null>(null);
   const [toDelete, setToDelete] = useState<Tecnologia | null>(null);
+  const queryClient = useQueryClient();
 
   const projetoMap = useMemo(() => new Map(projetos.map((p) => [p.id, p])), [projetos]);
 
@@ -230,18 +231,25 @@ function TecnologiasPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Deseja excluir esta tecnologia?</AlertDialogTitle>
             <AlertDialogDescription>
-              {toDelete ? `"${toDelete.nome}" será removida permanentemente.` : ""}
+              Esta ação não pode ser desfeita. {toDelete ? `"${toDelete.nome}" será removida permanentemente.` : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => {
+              onClick={async () => {
                 if (toDelete) {
                   if (!canEdit("tecnologia", toDelete.id, currentEmail)) { denyToast(); setToDelete(null); return; }
-                  deleteTecnologia(toDelete.id);
-                  removeOwnership("tecnologia", toDelete.id);
+                  try {
+                    await deleteTecnologia(toDelete.id);
+                    removeOwnership("tecnologia", toDelete.id);
+                    queryClient.invalidateQueries({ queryKey: ["tecnologias"] });
+                    toast.success("Tecnologia excluída.");
+                  } catch (err) {
+                    console.error("Erro ao excluir tecnologia:", err);
+                    toast.error("Erro ao excluir tecnologia.");
+                  }
                 }
                 setToDelete(null);
               }}
@@ -342,7 +350,9 @@ function TecnologiaModal({
 
   const meta = CATEGORIAS[categoria];
 
-  const submit = () => {
+  const queryClient = useQueryClient();
+
+  const submit = async () => {
     if (!nome || !quantidade) return;
     const payload = {
       categoria,
@@ -356,17 +366,23 @@ function TecnologiaModal({
       data,
       observacoes: observacoes || undefined,
     };
-    if (editing) {
-      if (!canEdit("tecnologia", editing.id, currentEmail)) { denyToast(); return; }
-      updateTecnologia(editing.id, payload);
-      toast.success("Tecnologia atualizada.");
-    } else {
-      const newId = addTecnologia(payload);
-      setOwnership("tecnologia", newId, makeOwnership(currentEmail, currentName));
-      addNotification({ type: "tecnologia", title: "Nova tecnologia cadastrada", body: nome });
-      toast.success("Tecnologia cadastrada.");
+    try {
+      if (editing) {
+        if (!canEdit("tecnologia", editing.id, currentEmail)) { denyToast(); return; }
+        await updateTecnologia(editing.id, payload);
+        toast.success("Tecnologia atualizada.");
+      } else {
+        const newId = await addTecnologia(payload);
+        setOwnership("tecnologia", newId, makeOwnership(currentEmail, currentName));
+        addNotification({ type: "tecnologia", title: "Nova tecnologia cadastrada", body: nome });
+        toast.success("Tecnologia cadastrada.");
+      }
+      queryClient.invalidateQueries({ queryKey: ["tecnologias"] });
+      onOpenChange(false);
+    } catch (err) {
+      console.error("Erro ao salvar tecnologia:", err);
+      toast.error("Erro ao salvar tecnologia.");
     }
-    onOpenChange(false);
   };
 
 
