@@ -39,16 +39,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2, Loader2 } from "lucide-react";
 import {
   CATEGORIAS,
   CATEGORIA_ORDEM,
   CategoriaTec,
   Tecnologia,
-  addTecnologia,
-  deleteTecnologia,
-  updateTecnologia,
-  useTecnologias,
 } from "@/lib/tecnologiasStore";
 import { formatDate } from "@/lib/mockData";
 import { useProjetos } from "@/lib/projetosStore";
@@ -57,7 +53,6 @@ import { useCurrentUser } from "@/lib/useCurrentUser";
 import { CollaboratorsSection } from "@/components/CollaboratorsSection";
 import { addNotification } from "@/lib/notificationsStore";
 import { toast } from "sonner";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/tecnologias")({
@@ -66,15 +61,89 @@ export const Route = createFileRoute("/tecnologias")({
 
 const todasCategorias = CATEGORIA_ORDEM;
 
+const lineIdToCat: Record<number, CategoriaTec> = {
+  1: "hidrica",
+  2: "saneamento",
+  3: "energia",
+  4: "agroecologia",
+  5: "alimentacao",
+  6: "inclusao",
+  7: "formacao",
+  8: "ambiente",
+  9: "comunicacao",
+};
+
+const catToLineId: Record<string, number> = {
+  hidrica: 1,
+  saneamento: 2,
+  energia: 3,
+  agroecologia: 4,
+  alimentacao: 5,
+  inclusao: 6,
+  formacao: 7,
+  ambiente: 8,
+  comunicacao: 9,
+};
+
 function TecnologiasPage() {
-  const tecnologias = useTecnologias();
   const projetos = useProjetos();
   const { email: currentEmail, name: currentName } = useCurrentUser();
   const [open, setOpen] = useState(false);
   const [initialCat, setInitialCat] = useState<CategoriaTec>("hidrica");
   const [editing, setEditing] = useState<Tecnologia | null>(null);
   const [toDelete, setToDelete] = useState<Tecnologia | null>(null);
-  const queryClient = useQueryClient();
+  
+  // Regra 1: Busca direta sem cache intermediário
+  const [tecnologias, setTecnologias] = useState<Tecnologia[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchTecnologias = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("projeto_tecnologias")
+      .select(`
+        id,
+        projeto_id,
+        quantidade,
+        unidade,
+        familias,
+        municipios,
+        comunidades,
+        data,
+        observacoes,
+        tecnologias_sociais (
+          nome,
+          linha_de_acao_id
+        )
+      `)
+      .order('data', { ascending: false });
+
+    if (error) {
+      console.error('ERRO SUPABASE:', error.code, error.message, error.details, error.hint);
+      toast.error(`Erro: ${error.message} (código: ${error.code})`);
+    } else {
+      // Regra 3: Nenhum .filter() client-side sobre os projetos para garantir que todos apareçam
+      const mapped: Tecnologia[] = (data || []).map((row: any) => ({
+        id: row.id,
+        categoria: lineIdToCat[row.tecnologias_sociais?.linha_de_acao_id] || "hidrica",
+        nome: row.tecnologias_sociais?.nome || "",
+        quantidade: row.quantidade,
+        unidade: row.unidade,
+        familias: row.familias || undefined,
+        municipios: row.municipios || "",
+        comunidades: row.comunidades || undefined,
+        projetoId: row.projeto_id || undefined,
+        data: row.data || new Date().toISOString().slice(0, 10),
+        observacoes: row.observacoes || undefined,
+      }));
+      setTecnologias(mapped);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchTecnologias();
+  }, []);
 
   const projetoMap = useMemo(() => new Map(projetos.map((p) => [p.id, p])), [projetos]);
 
@@ -115,7 +184,11 @@ function TecnologiasPage() {
       }
     >
       <div className="space-y-6">
-        {todasCategorias.map((cat) => {
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : todasCategorias.map((cat) => {
           const meta = CATEGORIAS[cat];
           const items = grouped[cat];
           const total = items.reduce((acc, it) => acc + (Number(it.quantidade) || 0), 0);
@@ -224,6 +297,7 @@ function TecnologiasPage() {
         projetos={projetos}
         currentEmail={currentEmail}
         currentName={currentName}
+        onSuccess={fetchTecnologias}
       />
 
       <AlertDialog open={!!toDelete} onOpenChange={(v) => !v && setToDelete(null)}>
@@ -242,13 +316,15 @@ function TecnologiasPage() {
                 if (toDelete) {
                   if (!canEdit("tecnologia", toDelete.id, currentEmail)) { denyToast(); setToDelete(null); return; }
                   try {
-                    await deleteTecnologia(toDelete.id);
+                    const { error } = await supabase.from("projeto_tecnologias").delete().eq("id", toDelete.id);
+                    if (error) throw error;
+                    
                     removeOwnership("tecnologia", toDelete.id);
-                    queryClient.invalidateQueries({ queryKey: ["tecnologias_sociais_catalog"] });
                     toast.success("Tecnologia excluída.");
-                  } catch (err) {
-                    console.error("Erro ao excluir tecnologia:", err);
-                    toast.error("Erro ao excluir tecnologia.");
+                    await fetchTecnologias();
+                  } catch (err: any) {
+                    console.error('ERRO COMPLETO:', JSON.stringify(err, null, 2));
+                    toast.error('Erro ao excluir tecnologia: ' + JSON.stringify(err));
                   }
                 }
                 setToDelete(null);
@@ -263,18 +339,6 @@ function TecnologiasPage() {
   );
 }
 
-const catToLineId: Record<string, number> = {
-  hidrica: 1,
-  saneamento: 2,
-  energia: 3,
-  agroecologia: 4,
-  alimentacao: 5,
-  inclusao: 6,
-  formacao: 7,
-  ambiente: 8,
-  comunicacao: 9,
-};
-
 function TecnologiaModal({
   open,
   onOpenChange,
@@ -283,6 +347,7 @@ function TecnologiaModal({
   projetos,
   currentEmail,
   currentName,
+  onSuccess,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -291,17 +356,17 @@ function TecnologiaModal({
   projetos: { id: string; nome: string }[];
   currentEmail: string;
   currentName: string;
+  onSuccess: () => Promise<void>;
 }) {
-  const { data: dbCatalog = [] } = useQuery({
-    queryKey: ["tecnologias_sociais_catalog"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("tecnologias_sociais")
-        .select("id, nome, linha_de_acao_id");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
+  const [dbCatalog, setDbCatalog] = useState<{id: string, nome: string, linha_de_acao_id: number}[]>([]);
+
+  useEffect(() => {
+    if (open) {
+      supabase.from("tecnologias_sociais").select("id, nome, linha_de_acao_id").then(({data}) => {
+        if (data) setDbCatalog(data);
+      });
+    }
+  }, [open]);
 
   const [categoria, setCategoria] = useState<CategoriaTec>(initialCategoria);
   const [nome, setNome] = useState("");
@@ -350,38 +415,71 @@ function TecnologiaModal({
 
   const meta = CATEGORIAS[categoria];
 
-  const queryClient = useQueryClient();
-
   const submit = async () => {
-    if (!nome || !quantidade) return;
-    const payload = {
-      categoria,
-      nome,
-      quantidade: Number(quantidade),
-      unidade,
-      familias: meta.mostraFamilias && familias ? Number(familias) : undefined,
-      municipios,
-      comunidades: comunidades || undefined,
-      projetoId: projetoId || undefined,
-      data,
-      observacoes: observacoes || undefined,
-    };
+    if (!nome || !quantidade || !projetoId) {
+      toast.error("Preencha o nome, a quantidade e o projeto.");
+      return;
+    }
+    
     try {
+      const lineId = catToLineId[categoria] || 1;
+      let techId = null;
+
+      // Buscar ou criar na tabela do catálogo
+      const { data: existingTech } = await supabase.from("tecnologias_sociais").select("id").eq("nome", nome).maybeSingle();
+      if (existingTech) {
+        techId = existingTech.id;
+      } else {
+        const { data: newTech, error: errNew } = await supabase.from("tecnologias_sociais").insert({
+          nome,
+          linha_de_acao_id: lineId,
+          tipo_entrega: categoria === "formacao" || categoria === "comunicacao" || categoria === "inclusao" ? "Metodológica" : "Física"
+        }).select("id").single();
+        if (errNew) throw errNew;
+        techId = newTech.id;
+      }
+
       if (editing) {
         if (!canEdit("tecnologia", editing.id, currentEmail)) { denyToast(); return; }
-        await updateTecnologia(editing.id, payload);
+        const { error } = await supabase.from("projeto_tecnologias").update({
+          projeto_id: projetoId || null,
+          tecnologia_id: techId,
+          quantidade: Number(quantidade),
+          unidade,
+          familias: meta.mostraFamilias && familias ? Number(familias) : null,
+          municipios,
+          comunidades: comunidades || null,
+          data,
+          observacoes: observacoes || null,
+        }).eq("id", editing.id);
+        if (error) throw error;
         toast.success("Tecnologia atualizada.");
       } else {
-        const newId = await addTecnologia(payload);
-        setOwnership("tecnologia", newId, makeOwnership(currentEmail, currentName));
+        const id = crypto.randomUUID();
+        const { error } = await supabase.from("projeto_tecnologias").insert({
+          id,
+          projeto_id: projetoId || null,
+          tecnologia_id: techId,
+          quantidade: Number(quantidade),
+          unidade,
+          familias: meta.mostraFamilias && familias ? Number(familias) : null,
+          municipios,
+          comunidades: comunidades || null,
+          data,
+          observacoes: observacoes || null,
+        });
+        if (error) throw error;
+        setOwnership("tecnologia", id, makeOwnership(currentEmail, currentName));
         addNotification({ type: "tecnologia", title: "Nova tecnologia cadastrada", body: nome });
         toast.success("Tecnologia cadastrada.");
       }
-      queryClient.invalidateQueries({ queryKey: ["tecnologias_sociais_catalog"] });
+      
+      // Regra 2: Após o insert, chame o fetch manualmente
+      await onSuccess();
       onOpenChange(false);
-    } catch (err) {
-      console.error("Erro ao salvar tecnologia:", err);
-      toast.error("Erro ao salvar tecnologia.");
+    } catch (err: any) {
+      console.error('ERRO COMPLETO:', JSON.stringify(err, null, 2));
+      toast.error('Erro ao salvar tecnologia: ' + JSON.stringify(err));
     }
   };
 
