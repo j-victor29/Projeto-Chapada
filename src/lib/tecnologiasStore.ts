@@ -214,9 +214,9 @@ export const fetchTecnologias = async () => {
         comunidades,
         data,
         observacoes,
-        tecnologias_sociais (
+        tecnologias (
           nome,
-          linha_de_acao_id
+          linha_acao
         )
       `);
 
@@ -226,19 +226,37 @@ export const fetchTecnologias = async () => {
     }
 
     if (data) {
-      tecnologias = data.map((row: any) => ({
-        id: row.id,
-        categoria: lineIdToCat[row.tecnologias_sociais?.linha_de_acao_id] || "hidrica",
-        nome: row.tecnologias_sociais?.nome || "",
-        quantidade: row.quantidade,
-        unidade: row.unidade,
-        familias: row.familias || undefined,
-        municipios: row.municipios || "",
-        comunidades: row.comunidades || undefined,
-        projetoId: row.projeto_id || undefined,
-        data: row.data || new Date().toISOString().slice(0, 10),
-        observacoes: row.observacoes || undefined,
-      }));
+      tecnologias = data.map((row: any) => {
+        const linha = row.tecnologias?.linha_acao || "";
+        let categoria: CategoriaTec = "hidrica";
+        if (linha === "Convivência com o Semiárido e Segurança Hídrica") {
+          categoria = "hidrica";
+        } else if (linha === "Saneamento Rural") {
+          categoria = "saneamento";
+        } else if (linha === "Energias Renováveis") {
+          categoria = "energia";
+        } else if (linha === "Agroecologia e Produção Sustentável") {
+          categoria = "agroecologia";
+        } else if (linha === "Fortalecimento Organizativo") {
+          categoria = "formacao";
+        } else if (linha === "Direitos e Cidadania") {
+          categoria = "comunicacao";
+        }
+
+        return {
+          id: row.id,
+          categoria,
+          nome: row.tecnologias?.nome || "",
+          quantidade: row.quantidade,
+          unidade: row.unidade,
+          familias: row.familias || undefined,
+          municipios: row.municipios || "",
+          comunidades: row.comunidades || undefined,
+          projetoId: row.projeto_id || undefined,
+          data: row.data || new Date().toISOString().slice(0, 10),
+          observacoes: row.observacoes || undefined,
+        };
+      });
       emit();
     }
   } catch (err) {
