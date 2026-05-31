@@ -244,7 +244,7 @@ function TecnologiasPage() {
                   try {
                     await deleteTecnologia(toDelete.id);
                     removeOwnership("tecnologia", toDelete.id);
-                    queryClient.invalidateQueries({ queryKey: ["tecnologias"] });
+                    queryClient.invalidateQueries({ queryKey: ["tecnologias_sociais_catalog"] });
                     toast.success("Tecnologia excluída.");
                   } catch (err) {
                     console.error("Erro ao excluir tecnologia:", err);
@@ -377,7 +377,7 @@ function TecnologiaModal({
         addNotification({ type: "tecnologia", title: "Nova tecnologia cadastrada", body: nome });
         toast.success("Tecnologia cadastrada.");
       }
-      queryClient.invalidateQueries({ queryKey: ["tecnologias"] });
+      queryClient.invalidateQueries({ queryKey: ["tecnologias_sociais_catalog"] });
       onOpenChange(false);
     } catch (err) {
       console.error("Erro ao salvar tecnologia:", err);
