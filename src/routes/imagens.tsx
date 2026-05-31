@@ -68,9 +68,9 @@ import { CollaboratorsSection } from "@/components/CollaboratorsSection";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/imagens")({
-  head: () => ({ meta: [{ title: "Banco de Imagens — CHAPADA" }] }),
   component: ImagensPage,
 });
+
 
 const TIPOS = [
   "Oficina",
@@ -140,7 +140,7 @@ function ImagensPage() {
     const today = new Date();
     const isoDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
     setPending({ file, previewUrl });
-    setForm({ projetoId: "", projetoNome: "", local: "", tipo: "", date: isoDate });
+    setForm({ projetoId: "", projetoNome: "", local: "", tipo: "", date: isoDate, categoriaId: "" });
   };
 
   const handleSave = async () => {

@@ -109,7 +109,7 @@ export const initImagens = async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const nomeProjeto = (row as any).projetos?.nome ?? "";
     const nomeCategoria = (row as any).categorias?.nome ?? undefined;
-    return rowToImagem({ ...row, nome_projeto: nomeProjeto, nome_categoria: nomeCategoria });
+    return rowToImagem({ ...(row as any), nome_projeto: nomeProjeto, nome_categoria: nomeCategoria });
   });
   emit();
 };
@@ -171,7 +171,7 @@ export const addImagem = async (payload: AddImagemPayload): Promise<string> => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const nomeProjeto = (rowData as any).projetos?.nome ?? payload.projeto;
   const nomeCategoria = (rowData as any).categorias?.nome ?? undefined;
-  const nova = rowToImagem({ ...rowData, nome_projeto: nomeProjeto, nome_categoria: nomeCategoria });
+  const nova = rowToImagem({ ...(rowData as any), nome_projeto: nomeProjeto, nome_categoria: nomeCategoria });
   imagens = [nova, ...imagens];
   emit();
   return nova.id;

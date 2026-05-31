@@ -32,9 +32,9 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/usuarios")({
-  head: () => ({ meta: [{ title: "Usuários — CHAPADA" }] }),
   component: UsuariosPage,
 });
+
 
 interface UsuarioRow {
   id: string;
@@ -85,7 +85,7 @@ function UsuariosPage() {
         .select("id, email, nome_completo, role, cargo, updated_at")
         .order("nome_completo", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as UsuarioRow[];
+      return (data ?? []) as any as UsuarioRow[];
     },
     staleTime: 60_000,
   });

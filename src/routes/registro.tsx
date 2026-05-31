@@ -9,9 +9,9 @@ import { capitalize } from "@/lib/profileStore";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/registro")({
-  head: () => ({ meta: [{ title: "Cadastro — CHAPADA" }] }),
   component: RegistroPage,
 });
+
 
 type Step = "email" | "password" | "done";
 

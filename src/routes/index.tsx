@@ -6,12 +6,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 const DashboardPage = lazy(() => import("./index.page"));
 
 export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "Dashboard — CHAPADA" },
-      { name: "description", content: "Visão geral dos projetos e indicadores da CHAPADA." },
-    ],
-  }),
   component: () => (
     <Suspense
       fallback={

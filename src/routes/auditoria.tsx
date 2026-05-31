@@ -40,14 +40,9 @@ import { toast } from "sonner";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/auditoria")({
-  head: () => ({
-    meta: [
-      { title: "Auditoria — CHAPADA" },
-      { name: "description", content: "Logs de alterações e auditoria do sistema." },
-    ],
-  }),
   component: AuditoriaPage,
 });
+
 
 interface AuditLog {
   id: string;

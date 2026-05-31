@@ -8,9 +8,9 @@ import { AuthLayout, ChapadaLogo } from "@/components/AuthLayout";
 import { DarkInput, FieldLabel } from "./login";
 
 export const Route = createFileRoute("/criar-senha")({
-  head: () => ({ meta: [{ title: "Criar senha — CHAPADA" }] }),
   component: CriarSenhaPage,
 });
+
 
 function CriarSenhaPage() {
   const navigate = useNavigate();

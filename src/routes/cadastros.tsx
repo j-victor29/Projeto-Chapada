@@ -18,22 +18,9 @@ import { toast } from "sonner";
 import { useDebounce } from "@/hooks/use-debounce";
 
 export const Route = createFileRoute("/cadastros")({
-  head: () => ({ meta: [{ title: "Cadastros — CHAPADA" }] }),
-  component: () => (
-    <Suspense
-      fallback={
-        <AppLayout title="Cadastros institucionais" subtitle="Municípios, comunidades, financiadores, categorias, públicos e famílias">
-          <div className="space-y-3">
-            <Skeleton className="h-10 w-full rounded-lg" />
-            <Skeleton className="h-64 w-full rounded-xl" />
-          </div>
-        </AppLayout>
-      }
-    >
-      <CadastrosPage />
-    </Suspense>
-  ),
+  component: CadastrosPage,
 });
+
 
 function CadastrosPage() {
   return (

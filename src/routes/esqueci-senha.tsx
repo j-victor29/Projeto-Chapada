@@ -8,9 +8,9 @@ import { isAllowedEmail, DOMAIN_ERROR } from "@/lib/auth-domain";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/esqueci-senha")({
-  head: () => ({ meta: [{ title: "Recuperar senha — CHAPADA" }] }),
   component: EsqueciSenhaPage,
 });
+
 
 type Step = "email" | "done";
 

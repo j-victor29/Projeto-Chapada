@@ -75,12 +75,6 @@ import {
 } from "@/lib/projetosStore";
 
 export const Route = createFileRoute("/projetos")({
-  head: () => ({
-    meta: [
-      { title: "Projetos — CHAPADA" },
-      { name: "description", content: "Cadastro e gestão de projetos institucionais." },
-    ],
-  }),
   component: () => (
     <Suspense
       fallback={

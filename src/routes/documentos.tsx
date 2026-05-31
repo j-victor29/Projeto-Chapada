@@ -27,14 +27,9 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/documentos")({
-  head: () => ({
-    meta: [
-      { title: "Biblioteca de Documentos — CHAPADA" },
-      { name: "description", content: "Organização institucional, categorização e versionamento de documentos." }
-    ],
-  }),
   component: DocumentosPage,
 });
+
 
 function safeFormatDate(dateStr?: string | null) {
   if (!dateStr) return "—";

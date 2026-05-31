@@ -61,15 +61,6 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/tecnologias")({
-  head: () => ({
-    meta: [
-      { title: "Tecnologias Sociais — CHAPADA" },
-      {
-        name: "description",
-        content: "Registro e monitoramento das tecnologias implementadas pela CHAPADA.",
-      },
-    ],
-  }),
   component: TecnologiasPage,
 });
 

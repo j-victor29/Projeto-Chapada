@@ -48,7 +48,7 @@ export const fetchProfile = async (email: string) => {
           firstName,
           lastName,
           photoDataUrl: data.photo_url || undefined,
-          role: data.role || "visualizador",
+          role: (data.role as any) || "visualizador",
         },
       };
       emit();

@@ -24,9 +24,9 @@ import { toast } from "sonner";
 import { useAtividades, useAtividadesIndicadores, useAtividadesIndependentes } from "@/lib/atividadesStore";
 
 export const Route = createFileRoute("/indicadores")({
-  head: () => ({ meta: [{ title: "Indicadores — CHAPADA" }] }),
   component: IndicadoresPage,
 });
+
 
 const COLORS = [
   "oklch(0.6 0.16 40)",

@@ -12,10 +12,10 @@ const searchSchema = z.object({
 });
 
 export const Route = createFileRoute("/login")({
-  head: () => ({ meta: [{ title: "Login — CHAPADA" }] }),
   validateSearch: searchSchema,
   component: LoginPage,
 });
+
 
 function LoginPage() {
   const navigate = useNavigate();

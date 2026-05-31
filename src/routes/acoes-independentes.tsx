@@ -70,7 +70,6 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/acoes-independentes")({
-  head: () => ({ meta: [{ title: "Ações Independentes — CHAPADA" }] }),
   component: AcoesIndependentesPage,
 });
 

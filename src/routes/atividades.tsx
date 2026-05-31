@@ -71,7 +71,6 @@ import { CollaboratorsSection } from "@/components/CollaboratorsSection";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/atividades")({
-  head: () => ({ meta: [{ title: "Atividades — CHAPADA" }] }),
   component: () => (
     <Suspense
       fallback={
