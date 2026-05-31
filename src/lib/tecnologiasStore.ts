@@ -278,18 +278,59 @@ const getOrCreateCatalogTechId = async (nome: string, categoria: CategoriaTec): 
   }
 };
 
-export const addTecnologia = (t: Omit<Tecnologia, "id">): string => {
+export const addTecnologia = async (t: Omit<Tecnologia, "id">): Promise<string> => {
   const id = crypto.randomUUID();
+  // Optimistic update: item aparece imediatamente na UI
   tecnologias = [{ ...t, id }, ...tecnologias];
   emit();
 
-  (async () => {
-    try {
-      const techId = await getOrCreateCatalogTechId(t.nome, t.categoria);
-      if (!techId) return;
+  try {
+    const techId = await getOrCreateCatalogTechId(t.nome, t.categoria);
+    if (!techId) {
+      console.error("[TecnologiasStore] failed to get/create catalog tech — keeping optimistic state");
+      return id;
+    }
 
-      const { error } = await supabase.from("projeto_tecnologias").insert({
-        id,
+    const { error } = await supabase.from("projeto_tecnologias").insert({
+      id,
+      projeto_id: t.projetoId || null,
+      tecnologia_id: techId,
+      quantidade: t.quantidade,
+      unidade: t.unidade,
+      familias: t.familias || null,
+      municipios: t.municipios || null,
+      comunidades: t.comunidades || null,
+      data: t.data || null,
+      observacoes: t.observacoes || null,
+    });
+
+    if (error) {
+      console.error("[TecnologiasStore] error adding technology:", error);
+    }
+    // Re-fetch após o INSERT estar confirmado no banco
+    await fetchTecnologias();
+  } catch (err) {
+    console.error("[TecnologiasStore] exception in addTecnologia:", err);
+  }
+
+  return id;
+};
+
+export const updateTecnologia = async (id: string, t: Omit<Tecnologia, "id">): Promise<void> => {
+  // Optimistic update
+  tecnologias = tecnologias.map((it) => (it.id === id ? { ...t, id } : it));
+  emit();
+
+  try {
+    const techId = await getOrCreateCatalogTechId(t.nome, t.categoria);
+    if (!techId) {
+      console.error("[TecnologiasStore] failed to get/create catalog tech for update");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("projeto_tecnologias")
+      .update({
         projeto_id: t.projetoId || null,
         tecnologia_id: techId,
         quantidade: t.quantidade,
@@ -299,73 +340,36 @@ export const addTecnologia = (t: Omit<Tecnologia, "id">): string => {
         comunidades: t.comunidades || null,
         data: t.data || null,
         observacoes: t.observacoes || null,
-      });
+      })
+      .eq("id", id);
 
-      if (error) {
-        console.error("[TecnologiasStore] error adding technology:", error);
-      }
-      fetchTecnologias();
-    } catch (err) {
-      console.error("[TecnologiasStore] exception in addTecnologia:", err);
+    if (error) {
+      console.error("[TecnologiasStore] error updating technology:", error);
     }
-  })();
-
-  return id;
+    await fetchTecnologias();
+  } catch (err) {
+    console.error("[TecnologiasStore] exception in updateTecnologia:", err);
+  }
 };
 
-export const updateTecnologia = (id: string, t: Omit<Tecnologia, "id">) => {
-  tecnologias = tecnologias.map((it) => (it.id === id ? { ...t, id } : it));
-  emit();
-
-  (async () => {
-    try {
-      const techId = await getOrCreateCatalogTechId(t.nome, t.categoria);
-      if (!techId) return;
-
-      const { error } = await supabase
-        .from("projeto_tecnologias")
-        .update({
-          projeto_id: t.projetoId || null,
-          tecnologia_id: techId,
-          quantidade: t.quantidade,
-          unidade: t.unidade,
-          familias: t.familias || null,
-          municipios: t.municipios || null,
-          comunidades: t.comunidades || null,
-          data: t.data || null,
-          observacoes: t.observacoes || null,
-        })
-        .eq("id", id);
-
-      if (error) {
-        console.error("[TecnologiasStore] error updating technology:", error);
-      }
-      fetchTecnologias();
-    } catch (err) {
-      console.error("[TecnologiasStore] exception in updateTecnologia:", err);
-    }
-  })();
-};
-
-export const deleteTecnologia = (id: string) => {
+export const deleteTecnologia = async (id: string): Promise<void> => {
+  // Optimistic update
   tecnologias = tecnologias.filter((it) => it.id !== id);
   emit();
 
-  (async () => {
-    try {
-      const { error } = await supabase
-        .from("projeto_tecnologias")
-        .delete()
-        .eq("id", id);
+  try {
+    const { error } = await supabase
+      .from("projeto_tecnologias")
+      .delete()
+      .eq("id", id);
 
-      if (error) {
-        console.error("[TecnologiasStore] error deleting technology:", error);
-      }
-      fetchTecnologias();
-    } catch (err) {
-      console.error("[TecnologiasStore] exception in deleteTecnologia:", err);
+    if (error) {
+      console.error("[TecnologiasStore] error deleting technology:", error);
     }
-  })();
+    await fetchTecnologias();
+  } catch (err) {
+    console.error("[TecnologiasStore] exception in deleteTecnologia:", err);
+  }
 };
 
 export const useTecnologias = () => {

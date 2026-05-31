@@ -39,9 +39,8 @@ export const Route = createFileRoute("/usuarios")({
 interface UsuarioRow {
   id: string;
   email: string;
-  nome_completo: string | null;
+  full_name: string | null;
   role: string | null;
-  cargo: string | null;
   updated_at: string | null;
 }
 
@@ -82,8 +81,8 @@ function UsuariosPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, email, nome_completo, role, cargo, updated_at")
-        .order("nome_completo", { ascending: true });
+        .select("id, email, full_name, role, updated_at")
+        .order("full_name", { ascending: true });
       if (error) throw error;
       return (data ?? []) as any as UsuarioRow[];
     },
@@ -94,7 +93,7 @@ function UsuariosPage() {
     const q = query.trim().toLowerCase();
     if (!q) return usuarios;
     return usuarios.filter((u) =>
-      [u.nome_completo ?? "", u.email].join(" ").toLowerCase().includes(q)
+      [u.full_name ?? "", u.email].join(" ").toLowerCase().includes(q)
     );
   }, [query, usuarios]);
 
@@ -111,7 +110,7 @@ function UsuariosPage() {
       body: text.slice(0, 140),
       from: senderName,
     });
-    toast.success(`Mensagem enviada para ${recipient.nome_completo ?? recipient.email}.`);
+    toast.success(`Mensagem enviada para ${recipient.full_name ?? recipient.email}.`);
     setRecipient(null);
     setMessage("");
   };
@@ -162,7 +161,7 @@ function UsuariosPage() {
                 </TableRow>
               ) : (
                 filtered.map((u) => {
-                  const displayName = u.nome_completo?.trim() || u.email.split("@")[0];
+                  const displayName = u.full_name?.trim() || u.email.split("@")[0];
                   const initials = displayName
                     .split(" ")
                     .map((n: string) => n[0])
@@ -183,7 +182,7 @@ function UsuariosPage() {
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {u.cargo ?? <span className="italic text-muted-foreground/60">—</span>}
+                        <span className="italic text-muted-foreground/60">—</span>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                         {formatLastUpdate(u.updated_at)}
@@ -220,7 +219,7 @@ function UsuariosPage() {
           <DialogHeader>
             <DialogTitle>Enviar mensagem</DialogTitle>
             <DialogDescription>
-              Para: <strong>{recipient?.nome_completo ?? recipient?.email}</strong>
+              Para: <strong>{recipient?.full_name ?? recipient?.email}</strong>
               <br />
               <span className="text-xs text-muted-foreground">{recipient?.email}</span>
             </DialogDescription>
