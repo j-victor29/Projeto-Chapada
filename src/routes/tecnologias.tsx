@@ -39,20 +39,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { 
-  Pencil, 
-  Plus, 
-  Trash2, 
-  Loader2, 
-  Search, 
-  Droplets, 
-  Users, 
-  MapPin, 
-  FolderGit2, 
-  Sparkles, 
-  Info, 
-  CheckCircle2, 
-  Wrench 
+import {
+  Pencil,
+  Plus,
+  Trash2,
+  Loader2,
+  Search,
+  Droplets,
+  Users,
+  MapPin,
+  Info,
+  Wrench,
 } from "lucide-react";
 import { formatDate } from "@/lib/mockData";
 import { useProjetos } from "@/lib/projetosStore";
@@ -119,6 +116,7 @@ function TecnologiasPage() {
         data,
         observacoes,
         tecnologias (
+          id,
           nome,
           linha_acao
         ),
@@ -210,257 +208,182 @@ function TecnologiasPage() {
     });
   }, [tecnologias, searchQuery, linhaFiltro]);
 
-  const getLinhaAcaoBadge = (linha: string) => {
-    switch (linha) {
-      case "Convivência com o Semiárido e Segurança Hídrica":
-        return "bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 border border-sky-200/50";
-      case "Saneamento Rural":
-        return "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/50";
-      case "Energias Renováveis":
-        return "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200/50";
-      case "Agroecologia e Produção Sustentável":
-        return "bg-lime-50 text-lime-700 dark:bg-lime-950/40 dark:text-lime-300 border border-lime-200/50";
-      case "Fortalecimento Organizativo":
-        return "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border border-indigo-200/50";
-      case "Direitos e Cidadania":
-        return "bg-pink-50 text-pink-700 dark:bg-pink-950/40 dark:text-pink-300 border border-pink-200/50";
-      default:
-        return "bg-slate-50 text-slate-700 dark:bg-slate-950/40 dark:text-slate-300 border border-slate-200/50";
-    }
-  };
-
   return (
     <AppLayout
       title="Tecnologias Sociais"
       subtitle="Catálogo oficial e registro de tecnologias sociais implementadas pela CHAPADA no Semiárido"
       actions={
-        <Button className="gap-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-medium shadow-md shadow-orange-500/10 transition-all duration-300 transform hover:-translate-y-0.5" onClick={openCreate}>
+        <Button onClick={openCreate} className="gap-2">
           <Plus className="h-4 w-4" /> Nova Tecnologia
         </Button>
       }
     >
       <div className="space-y-6">
-        {/* Bloco Informativo Premium da ONG */}
-        <div className="bg-gradient-to-br from-teal-900/10 via-emerald-900/5 to-transparent border border-teal-500/20 rounded-2xl p-6 relative overflow-hidden shadow-inner">
-          <div className="absolute right-0 bottom-0 opacity-10 pointer-events-none transform translate-y-1/4 translate-x-1/4">
-            <Droplets className="w-96 h-96 text-teal-600" />
-          </div>
-          <div className="flex flex-col md:flex-row items-start md:items-center gap-6 relative z-10">
-            <div className="bg-teal-500/10 border border-teal-500/30 p-3.5 rounded-xl text-teal-600 dark:text-teal-400">
-              <Sparkles className="w-8 h-8" />
+        <Card className="bg-primary/5 border-primary/10">
+          <CardContent className="p-4 flex flex-col md:flex-row items-start md:items-center gap-4">
+            <div className="bg-primary/10 p-3 rounded-xl text-primary shrink-0">
+              <Droplets className="w-6 h-6" />
             </div>
             <div className="space-y-1">
-              <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <h3 className="font-semibold text-foreground flex items-center gap-2">
                 Convivência e Transformação no Semiárido
               </h3>
-              <p className="text-sm text-slate-600 dark:text-slate-350 max-w-4xl">
+              <p className="text-sm text-muted-foreground max-w-4xl">
                 A ONG Chapada acumula mais de 31 anos de atuação nas comunidades do Semiárido pernambucano e piauiense, 
                 tendo implantado quase <strong>11 mil tecnologias sociais hídricas</strong> e beneficiado aproximadamente 
                 <strong> 22 mil famílias agricultoras</strong>. Os registros abaixo são integrados aos projetos financiados pelos nossos parceiros e apoiadores.
               </p>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        {/* Dashboard de Métricas Resumidas */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="bg-gradient-to-br from-sky-50 to-white dark:from-sky-950/20 dark:to-slate-900 border-sky-100 dark:border-sky-900/50 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1">
+          <Card>
             <CardContent className="p-5 flex items-center justify-between">
               <div className="space-y-1">
-                <span className="text-xs text-sky-600 dark:text-sky-400 font-medium tracking-wide uppercase">Implementações</span>
-                <h4 className="text-2xl font-bold tracking-tight text-slate-800 dark:text-slate-100">
-                  {tecnologias.length}
-                </h4>
-                <p className="text-[11px] text-sky-500">Tecnologias registradas</p>
+                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Implementações</span>
+                <h4 className="text-2xl font-bold">{tecnologias.length}</h4>
+                <p className="text-[11px] text-muted-foreground">Tecnologias registradas</p>
               </div>
-              <div className="p-3 bg-sky-500/10 rounded-xl text-sky-600 dark:text-sky-400 border border-sky-500/20">
-                <Wrench className="w-5 h-5" />
-              </div>
+              <Wrench className="w-5 h-5 text-muted-foreground" />
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950/20 dark:to-slate-900 border-emerald-100 dark:border-emerald-900/50 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1">
+          <Card>
             <CardContent className="p-5 flex items-center justify-between">
               <div className="space-y-1">
-                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium tracking-wide uppercase">Quantidade Total</span>
-                <h4 className="text-2xl font-bold tracking-tight text-slate-800 dark:text-slate-100">
-                  {metrics.totalQty.toLocaleString("pt-BR")}
-                </h4>
-                <p className="text-[11px] text-emerald-500">Unidades implantadas</p>
+                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Quantidade Total</span>
+                <h4 className="text-2xl font-bold">{metrics.totalQty.toLocaleString("pt-BR")}</h4>
+                <p className="text-[11px] text-muted-foreground">Unidades implantadas</p>
               </div>
-              <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                <Droplets className="w-5 h-5" />
-              </div>
+              <Droplets className="w-5 h-5 text-muted-foreground" />
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-amber-50 to-white dark:from-amber-950/20 dark:to-slate-900 border-amber-100 dark:border-amber-900/50 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1">
+          <Card>
             <CardContent className="p-5 flex items-center justify-between">
               <div className="space-y-1">
-                <span className="text-xs text-amber-600 dark:text-amber-400 font-medium tracking-wide uppercase">Famílias Atendidas</span>
-                <h4 className="text-2xl font-bold tracking-tight text-slate-800 dark:text-slate-100">
-                  {metrics.totalFamilies.toLocaleString("pt-BR")}
-                </h4>
-                <p className="text-[11px] text-amber-500">Famílias beneficiadas</p>
+                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Famílias Atendidas</span>
+                <h4 className="text-2xl font-bold">{metrics.totalFamilies.toLocaleString("pt-BR")}</h4>
+                <p className="text-[11px] text-muted-foreground">Famílias beneficiadas</p>
               </div>
-              <div className="p-3 bg-amber-500/10 rounded-xl text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                <Users className="w-5 h-5" />
-              </div>
+              <Users className="w-5 h-5 text-muted-foreground" />
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950/20 dark:to-slate-900 border-indigo-100 dark:border-indigo-900/50 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1">
+          <Card>
             <CardContent className="p-5 flex items-center justify-between">
               <div className="space-y-1">
-                <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium tracking-wide uppercase">Alcance Geográfico</span>
-                <h4 className="text-2xl font-bold tracking-tight text-slate-800 dark:text-slate-100">
-                  {metrics.uniqueCities} {metrics.uniqueCities === 1 ? "Município" : "Municípios"}
-                </h4>
-                <p className="text-[11px] text-indigo-500">Em {metrics.uniqueProj} {metrics.uniqueProj === 1 ? "projeto" : "projetos"}</p>
+                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Alcance Geográfico</span>
+                <h4 className="text-2xl font-bold">{metrics.uniqueCities} {metrics.uniqueCities === 1 ? "Município" : "Municípios"}</h4>
+                <p className="text-[11px] text-muted-foreground">Em {metrics.uniqueProj} {metrics.uniqueProj === 1 ? "projeto" : "projetos"}</p>
               </div>
-              <div className="p-3 bg-indigo-500/10 rounded-xl text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-                <MapPin className="w-5 h-5" />
-              </div>
+              <MapPin className="w-5 h-5 text-muted-foreground" />
             </CardContent>
           </Card>
         </div>
 
-        {/* Listagem Principal e Filtros */}
-        <Card className="shadow-lg border-slate-200/60 dark:border-slate-800/80 overflow-hidden bg-white/80 dark:bg-slate-900/80 backdrop-blur-md">
-          <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4 bg-slate-50/50 dark:bg-slate-900/50">
-            <div className="space-y-0.5">
-              <h3 className="font-semibold text-slate-850 dark:text-slate-100 flex items-center gap-2">
-                <FolderGit2 className="w-4 h-4 text-orange-500" /> Registro de Tecnologias Implantadas
-              </h3>
-              <p className="text-xs text-muted-foreground">Consulte, edite ou registre tecnologias associadas aos projetos.</p>
+        <Card>
+          <CardContent className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 border-b border-border">
+            <div className="relative">
+              <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Buscar tecnologia, projeto..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
             </div>
-            
-            {/* Controles de Filtro */}
-            <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
-                <Input
-                  placeholder="Buscar tecnologia, projeto..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 h-9.5 text-xs bg-white dark:bg-slate-950/80 focus-visible:ring-orange-500/50 focus-visible:border-orange-500"
-                />
-              </div>
-
-              <div className="w-full sm:w-60">
-                <Select value={linhaFiltro} onValueChange={setLinhaFiltro}>
-                  <SelectTrigger className="h-9.5 text-xs bg-white dark:bg-slate-950/80 focus:ring-orange-500/50">
-                    <SelectValue placeholder="Filtrar por Linha de Ação" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-80">
-                    <SelectItem value="all" className="text-xs font-semibold text-orange-500 dark:text-orange-400">
-                      Todas as Linhas de Ação
-                    </SelectItem>
-                    {linhasDeAcao.map((linha) => (
-                      <SelectItem key={linha} value={linha} className="text-xs">
-                        {linha}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
+            <Select value={linhaFiltro} onValueChange={setLinhaFiltro}>
+              <SelectTrigger>
+                <SelectValue placeholder="Filtrar por Linha de Ação" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as Linhas de Ação</SelectItem>
+                {linhasDeAcao.map((linha) => (
+                  <SelectItem key={linha} value={linha}>
+                    {linha}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
           <CardContent className="p-0 overflow-x-auto">
             {loading ? (
-              <div className="flex justify-center items-center py-20">
-                <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
+              <div className="flex justify-center items-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : filteredTecnologias.length === 0 ? (
-              <div className="p-12 text-center space-y-2">
-                <Info className="h-10 w-10 text-slate-350 dark:text-slate-650 mx-auto" />
-                <p className="text-sm font-medium text-slate-500">Nenhum registro de tecnologia encontrado.</p>
-                <p className="text-xs text-muted-foreground max-w-md mx-auto">
-                  {searchQuery || linhaFiltro !== "all" 
-                    ? "Tente ajustar seus termos de pesquisa ou remover os filtros de Linha de Ação selecionados."
-                    : "Cadastre a primeira tecnologia utilizando o botão 'Nova Tecnologia' no canto superior direito."
-                  }
-                </p>
+              <div className="p-12 text-center text-muted-foreground">
+                <Info className="h-10 w-10 mx-auto mb-3 text-muted" />
+                <p>Nenhum registro de tecnologia encontrado.</p>
               </div>
             ) : (
               <Table>
-                <TableHeader className="bg-slate-50/70 dark:bg-slate-900/60 text-slate-800">
-                  <TableRow className="hover:bg-transparent border-slate-100 dark:border-slate-800">
-                    <TableHead className="font-semibold text-slate-700 dark:text-slate-200">Tecnologia</TableHead>
-                    <TableHead className="font-semibold text-slate-700 dark:text-slate-200">Linha de Ação</TableHead>
-                    <TableHead className="font-semibold text-slate-700 dark:text-slate-200">Projeto</TableHead>
-                    <TableHead className="font-semibold text-slate-700 dark:text-slate-200">Qtd.</TableHead>
-                    <TableHead className="font-semibold text-slate-700 dark:text-slate-200">Unidade</TableHead>
-                    <TableHead className="font-semibold text-slate-700 dark:text-slate-200">Famílias</TableHead>
-                    <TableHead className="font-semibold text-slate-700 dark:text-slate-200">Municípios</TableHead>
-                    <TableHead className="font-semibold text-slate-700 dark:text-slate-200">Comunidades</TableHead>
-                    <TableHead className="font-semibold text-slate-700 dark:text-slate-200">Data</TableHead>
-                    <TableHead className="font-semibold text-slate-700 dark:text-slate-200">Observações</TableHead>
-                    <TableHead className="w-[100px] text-right font-semibold text-slate-700 dark:text-slate-200">Ações</TableHead>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tecnologia</TableHead>
+                    <TableHead>Linha de Ação</TableHead>
+                    <TableHead>Projeto</TableHead>
+                    <TableHead>Qtd.</TableHead>
+                    <TableHead>Unidade</TableHead>
+                    <TableHead>Famílias</TableHead>
+                    <TableHead>Municípios</TableHead>
+                    <TableHead>Comunidades</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Observações</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredTecnologias.map((t) => (
-                    <TableRow key={t.id} className="border-slate-100 dark:border-slate-800/80 hover:bg-slate-50/40 dark:hover:bg-slate-850/20 transition-colors">
-                      <TableCell className="font-medium text-slate-800 dark:text-slate-100 whitespace-nowrap">
+                    <TableRow key={t.id}>
+                      <TableCell className="font-medium">
                         {t.tecnologias?.nome || "Sem Nome"}
                       </TableCell>
                       <TableCell>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-medium border ${getLinhaAcaoBadge(t.tecnologias?.linha_acao || "")}`}>
+                        <span className="px-2 py-0.5 rounded-full text-[11px] border bg-primary/10 text-primary border-primary/30 font-medium">
                           {t.tecnologias?.linha_acao || "—"}
                         </span>
                       </TableCell>
-                      <TableCell className="text-slate-750 dark:text-slate-300 font-medium">
-                        <div>{t.projetos?.nome || "—"}</div>
+                      <TableCell>
+                        <div className="font-medium">{t.projetos?.nome || "—"}</div>
                         {(() => { 
                           const o = getOwnership("tecnologia", t.id); 
                           return o ? (
-                            <div className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-500 inline" /> Criado por {o.ownerName}
+                            <div className="text-[10px] text-muted-foreground mt-0.5">
+                              Criado por {o.ownerName}
                             </div>
                           ) : null; 
                         })()}
                       </TableCell>
-                      <TableCell className="font-semibold text-slate-900 dark:text-slate-100">
+                      <TableCell className="font-semibold">
                         {t.quantidade.toLocaleString("pt-BR")}
                       </TableCell>
-                      <TableCell className="text-slate-500 dark:text-slate-400 text-xs">
+                      <TableCell className="text-sm">
                         {t.unidade}
                       </TableCell>
-                      <TableCell className="font-medium text-slate-700 dark:text-slate-300">
+                      <TableCell>
                         {t.familias ? t.familias.toLocaleString("pt-BR") : "—"}
                       </TableCell>
-                      <TableCell className="text-xs text-slate-600 dark:text-slate-400 max-w-[150px] truncate" title={t.municipios}>
+                      <TableCell className="text-xs truncate max-w-[150px]" title={t.municipios}>
                         {t.municipios || "—"}
                       </TableCell>
-                      <TableCell className="text-xs text-slate-500 dark:text-slate-400 max-w-[150px] truncate" title={t.comunidades}>
+                      <TableCell className="text-xs truncate max-w-[150px]" title={t.comunidades}>
                         {t.comunidades || "—"}
                       </TableCell>
-                      <TableCell className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                      <TableCell className="text-xs whitespace-nowrap">
                         {formatDate(t.data)}
                       </TableCell>
-                      <TableCell className="text-xs text-slate-500 dark:text-slate-400 max-w-[180px] truncate" title={t.observacoes}>
+                      <TableCell className="text-xs truncate max-w-[180px]" title={t.observacoes}>
                         {t.observacoes || "—"}
                       </TableCell>
                       <TableCell className="text-right whitespace-nowrap">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-650 dark:text-slate-350"
-                          aria-label="Editar"
-                          onClick={() => openEdit(t)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
+                        <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
+                          <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/20"
-                          aria-label="Excluir"
-                          onClick={() => requestDelete(t)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
+                        <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => requestDelete(t)}>
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -484,19 +407,17 @@ function TecnologiasPage() {
       />
 
       <AlertDialog open={!!toDelete} onOpenChange={(v) => !v && setToDelete(null)}>
-        <AlertDialogContent className="border border-slate-200 dark:border-slate-800">
+        <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-lg font-bold flex items-center gap-2 text-rose-600 dark:text-rose-500">
-              Deseja excluir esta tecnologia?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-sm">
-              Esta ação não pode ser desfeita. {toDelete ? `A tecnologia "${toDelete.tecnologias?.nome}" associada ao projeto "${toDelete.projetos?.nome}" será removida permanentemente do sistema.` : ""}
+            <AlertDialogTitle>Remover tecnologia?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. {toDelete ? `A tecnologia "${toDelete.tecnologias?.nome}" associada ao projeto "${toDelete.projetos?.nome}" será removida permanentemente.` : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="text-xs">Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-rose-600 hover:bg-rose-700 text-white font-medium text-xs shadow-md shadow-rose-600/10"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={async () => {
                 if (toDelete) {
                   if (!canEdit("tecnologia", toDelete.id, currentEmail)) { denyToast(); setToDelete(null); return; }
@@ -515,7 +436,7 @@ function TecnologiasPage() {
                 setToDelete(null);
               }}
             >
-              Confirmar Exclusão
+              Remover
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -666,36 +587,30 @@ function TecnologiaModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-slate-800 shadow-2xl rounded-2xl">
-        <DialogHeader className="border-b border-slate-100 dark:border-slate-800 pb-3">
-          <DialogTitle className="text-lg font-bold text-slate-850 dark:text-slate-100 flex items-center gap-2">
-            <span className="p-1.5 bg-orange-500/10 text-orange-600 rounded-lg dark:text-orange-400">
-              <Wrench className="w-5 h-5" />
-            </span>
+      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
             {editing ? "Editar Registro de Tecnologia" : "Novo Registro de Tecnologia"}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2">
           
-          {/* Tecnologia do Catálogo Oficial */}
-          <div className="md:col-span-2 space-y-1.5">
-            <Label className="text-xs font-semibold text-slate-700 dark:text-slate-350">
-              Tecnologia Social (Catálogo Chapada) <span className="text-rose-500">*</span>
-            </Label>
+          <div className="md:col-span-2">
+            <Label>Tecnologia Social (Catálogo Chapada) <span className="text-destructive">*</span></Label>
             <select
               value={tecnologiaId}
               onChange={(e) => setTecnologiaId(e.target.value)}
               required
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 text-slate-800 dark:text-slate-100 border-slate-250 dark:border-slate-750 focus:border-orange-500 focus:ring-orange-500/20"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <option value="">Selecione a tecnologia...</option>
               {linhasDeAcao.map((linha) => (
-                <optgroup key={linha} label={linha} className="text-xs font-bold text-teal-650 bg-slate-50 dark:bg-slate-900 py-1">
+                <optgroup key={linha} label={linha}>
                   {catalogo
                     .filter((t) => t.linha_acao === linha)
                     .map((t) => (
-                      <option key={t.id} value={t.id} className="text-xs text-slate-800 dark:text-slate-250 font-normal">
+                      <option key={t.id} value={t.id}>
                         {t.nome}
                       </option>
                     ))}
@@ -704,31 +619,24 @@ function TecnologiaModal({
             </select>
           </div>
 
-          {/* Quantidade */}
-          <div className="space-y-1.5">
-            <Label className="text-xs font-semibold text-slate-700 dark:text-slate-350">
-              Quantidade Implementada <span className="text-rose-500">*</span>
-            </Label>
+          <div>
+            <Label>Quantidade Implementada <span className="text-destructive">*</span></Label>
             <CurrencyInput
               step={1}
               value={quantidade !== "" ? Number(quantidade) : undefined}
               onChange={(v) => setQuantidade(v !== undefined ? String(v) : "")}
-              className="h-10 border-slate-250 dark:border-slate-750 focus:border-orange-500 focus:ring-orange-500/20"
             />
           </div>
 
-          {/* Unidade */}
-          <div className="space-y-1.5">
-            <Label className="text-xs font-semibold text-slate-700 dark:text-slate-350">
-              Unidade de Medida <span className="text-rose-500">*</span>
-            </Label>
+          <div>
+            <Label>Unidade de Medida <span className="text-destructive">*</span></Label>
             <Select value={unidade} onValueChange={setUnidade}>
-              <SelectTrigger className="h-10 border-slate-250 dark:border-slate-750 focus:ring-orange-500/20 text-xs">
+              <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-slate-950">
+              <SelectContent>
                 {["unidades", "hectares", "famílias"].map((u) => (
-                  <SelectItem key={u} value={u} className="text-xs">
+                  <SelectItem key={u} value={u}>
                     {u}
                   </SelectItem>
                 ))}
@@ -736,61 +644,48 @@ function TecnologiaModal({
             </Select>
           </div>
 
-          {/* Famílias Beneficiadas */}
           {isFamiliasVisible && (
-            <div className="space-y-1.5 md:col-span-2">
-              <Label className="text-xs font-semibold text-slate-700 dark:text-slate-350">
-                Famílias Beneficiadas (Opcional)
-              </Label>
+            <div className="md:col-span-2">
+              <Label>Famílias Beneficiadas (Opcional)</Label>
               <CurrencyInput
                 step={1}
                 value={familias !== "" ? Number(familias) : undefined}
                 onChange={(v) => setFamilias(v !== undefined ? String(v) : "")}
                 placeholder="Informe o número total de famílias atendidas"
-                className="h-10 border-slate-250 dark:border-slate-750 focus:border-orange-500 focus:ring-orange-500/20"
               />
             </div>
           )}
 
-          {/* Municípios Atendidos */}
-          <div className="md:col-span-2 space-y-1.5">
-            <Label className="text-xs font-semibold text-slate-700 dark:text-slate-350">
-              Municípios Atendidos <span className="text-rose-500">*</span>
-            </Label>
+          <div className="md:col-span-2">
+            <Label>Municípios Atendidos <span className="text-destructive">*</span></Label>
             <Input
               value={municipios}
               onChange={(e) => setMunicipios(e.target.value)}
               placeholder="Ex: Araripina, Ouricuri, Bodocó"
-              className="h-10 border-slate-250 dark:border-slate-750 focus-visible:ring-orange-500/30 focus-visible:border-orange-500 text-xs"
             />
           </div>
 
-          {/* Comunidades */}
-          <div className="md:col-span-2 space-y-1.5">
-            <Label className="text-xs font-semibold text-slate-700 dark:text-slate-350">Comunidades Atendidas</Label>
+          <div className="md:col-span-2">
+            <Label>Comunidades Atendidas</Label>
             <Input
               value={comunidades}
               onChange={(e) => setComunidades(e.target.value)}
               placeholder="Ex: Comunidade da Lagoa, Assentamento Mandacaru"
-              className="h-10 border-slate-250 dark:border-slate-750 focus-visible:ring-orange-500/30 focus-visible:border-orange-500 text-xs"
             />
           </div>
 
-          {/* Projeto Vinculado */}
-          <div className="space-y-1.5">
-            <Label className="text-xs font-semibold text-slate-700 dark:text-slate-350">
-              Projeto Vinculado <span className="text-rose-500">*</span>
-            </Label>
+          <div>
+            <Label>Projeto Vinculado <span className="text-destructive">*</span></Label>
             <Select value={projetoId || undefined} onValueChange={setProjetoId}>
-              <SelectTrigger className="h-10 border-slate-250 dark:border-slate-750 focus:ring-orange-500/20 text-xs">
+              <SelectTrigger>
                 <SelectValue placeholder="Selecione o projeto" />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-slate-950 max-h-60">
+              <SelectContent>
                 {projetos.length > 0 ? (
                   projetos
                     .filter((p) => p.id && String(p.id).trim() !== "")
                     .map((p) => (
-                      <SelectItem key={p.id} value={String(p.id)} className="text-xs">
+                      <SelectItem key={p.id} value={String(p.id)}>
                         {p.nome}
                       </SelectItem>
                     ))
@@ -801,28 +696,22 @@ function TecnologiaModal({
             </Select>
           </div>
 
-          {/* Data de Implementação */}
-          <div className="space-y-1.5">
-            <Label className="text-xs font-semibold text-slate-700 dark:text-slate-350">
-              Data de Implementação <span className="text-rose-500">*</span>
-            </Label>
+          <div>
+            <Label>Data de Implementação <span className="text-destructive">*</span></Label>
             <Input
               type="date"
               value={data}
               onChange={(e) => setData(e.target.value)}
-              className="h-10 border-slate-250 dark:border-slate-750 focus-visible:ring-orange-500/30 focus-visible:border-orange-500 text-xs"
             />
           </div>
 
-          {/* Observações */}
-          <div className="md:col-span-2 space-y-1.5">
-            <Label className="text-xs font-semibold text-slate-700 dark:text-slate-350">Observações adicionais</Label>
+          <div className="md:col-span-2">
+            <Label>Observações adicionais</Label>
             <Textarea
               value={observacoes}
               onChange={(e) => setObservacoes(e.target.value)}
               rows={3}
               placeholder="Descreva detalhes específicos do projeto ou implantação"
-              className="border-slate-250 dark:border-slate-750 focus-visible:ring-orange-500/30 focus-visible:border-orange-500 text-xs"
             />
           </div>
 
@@ -833,12 +722,12 @@ function TecnologiaModal({
           )}
         </div>
 
-        <DialogFooter className="border-t border-slate-100 dark:border-slate-800 pt-3">
-          <Button variant="outline" className="text-xs h-9.5" onClick={() => onOpenChange(false)}>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={submit} className="text-xs h-9.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold shadow-sm">
-            {editing ? "Salvar Alterações" : "Salvar Registro"}
+          <Button onClick={submit}>
+            {editing ? "Salvar" : "Salvar"}
           </Button>
         </DialogFooter>
       </DialogContent>

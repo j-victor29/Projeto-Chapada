@@ -268,7 +268,7 @@ const getOrCreateCatalogTechId = async (nome: string, categoria: CategoriaTec): 
   const lineId = catToLineId[categoria] || 1;
   try {
     const { data } = await supabase
-      .from("tecnologias_sociais")
+      .from("tecnologias")
       .select("id")
       .eq("nome", nome)
       .maybeSingle();
@@ -276,7 +276,7 @@ const getOrCreateCatalogTechId = async (nome: string, categoria: CategoriaTec): 
     if (data) return data.id;
 
     const { data: newTech, error } = await supabase
-      .from("tecnologias_sociais")
+      .from("tecnologias")
       .insert({
         nome,
         linha_de_acao_id: lineId,

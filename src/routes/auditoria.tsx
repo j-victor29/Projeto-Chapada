@@ -64,7 +64,7 @@ const ACAO_COLORS: Record<string, string> = {
 const TABELAS = [
   "projetos",
   "atividades",
-  "tecnologias_sociais",
+  "tecnologias",
   "arquivos_midia",
   "beneficiarios",
   "projeto_tecnologias",
