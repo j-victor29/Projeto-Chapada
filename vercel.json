@@ -1,5 +1,4 @@
 {
-  "_comment": "Este projeto usa TanStack Start + Cloudflare Workers. Não pode ser hospedado como SPA estática na Vercel. Use Cloudflare Pages (ver guia DEPLOY_CLOUDFLARE.md).",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
