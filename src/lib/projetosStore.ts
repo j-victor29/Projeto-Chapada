@@ -12,6 +12,7 @@ export interface ProjetoDB {
   termino: string;
   valor: number;
   municipios: string[];
+  comunidadesAtendidas: string[];
   publicoQuant: number;
   publicoCaract: string;
   status: ProjetoStatus;
@@ -44,6 +45,7 @@ function rowToProjeto(row: any): ProjetoDB {
     termino: row.termino ?? "",
     valor: Number(row.valor ?? 0),
     municipios: Array.isArray(row.municipios) ? row.municipios : [],
+    comunidadesAtendidas: Array.isArray(row.comunidades_atendidas) ? row.comunidades_atendidas : [],
     publicoQuant: Number(row.publico_quant ?? 0),
     publicoCaract: row.publico_caract ?? "",
     status: (row.status as ProjetoStatus) ?? "Em execução",
@@ -112,6 +114,7 @@ export const addProjeto = async (
       termino: p.termino,
       valor: p.valor,
       municipios: p.municipios,
+      comunidades_atendidas: p.comunidadesAtendidas || [],
       publico_quant: p.publicoQuant,
       publico_caract: p.publicoCaract || null,
       status: p.status,
@@ -147,6 +150,8 @@ export const updateProjeto = async (
   if (patch.valor !== undefined) updatePayload.valor = patch.valor;
   if (patch.municipios !== undefined)
     updatePayload.municipios = patch.municipios;
+  if (patch.comunidadesAtendidas !== undefined)
+    updatePayload.comunidades_atendidas = patch.comunidadesAtendidas;
   if (patch.publicoQuant !== undefined)
     updatePayload.publico_quant = patch.publicoQuant;
   if (patch.publicoCaract !== undefined)

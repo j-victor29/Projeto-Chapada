@@ -102,6 +102,8 @@ function ImagensPage() {
   const [editing, setEditing] = useState<ImagemItem | null>(null);
   const editingOwnership = useOwnership("imagem", editing?.id ?? "");
   const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null);
+  const [dataDe, setDataDe] = useState<string>("");
+  const [dataAte, setDataAte] = useState<string>("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<PendingFile | null>(null);
@@ -118,9 +120,12 @@ function ImagensPage() {
           .includes(q);
       const matchesCategoria =
         !categoriaFiltro || i.categoriaId === categoriaFiltro;
-      return matchesQuery && matchesCategoria;
+      const matchesData =
+        (!dataDe || (i.dataIso && i.dataIso >= dataDe)) &&
+        (!dataAte || (i.dataIso && i.dataIso <= dataAte));
+      return matchesQuery && matchesCategoria && matchesData;
     });
-  }, [imgs, query, categoriaFiltro]);
+  }, [imgs, query, categoriaFiltro, dataDe, dataAte]);
 
   const openPicker = () => fileInputRef.current?.click();
 
@@ -284,6 +289,43 @@ function ImagensPage() {
         </>
       }
     >
+      {/* ─── FILTROS DE PERÍODO ────────────────────────────────────────────── */}
+      <Card className="mb-4 border-border/50 bg-card/60 backdrop-blur-sm">
+        <CardContent className="p-4 flex flex-wrap gap-4 items-center justify-between">
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Período:</span>
+              <Input
+                type="date"
+                value={dataDe}
+                onChange={(e) => setDataDe(e.target.value)}
+                className="h-9 w-36 text-xs"
+              />
+              <span className="text-xs text-muted-foreground">até</span>
+              <Input
+                type="date"
+                value={dataAte}
+                onChange={(e) => setDataAte(e.target.value)}
+                className="h-9 w-36 text-xs"
+              />
+              {(dataDe || dataAte) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setDataDe("");
+                    setDataAte("");
+                  }}
+                  className="h-9 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Limpar período
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* ── Barra de filtro por categoria ─────────────────────────── */}
       {categorias.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap mb-4">
@@ -321,7 +363,7 @@ function ImagensPage() {
       {filtered.length === 0 ? (
         <Card>
           <CardContent className="p-12 text-center text-muted-foreground text-sm">
-            {query || categoriaFiltro
+            {query || categoriaFiltro || dataDe || dataAte
               ? "Nenhuma imagem encontrada para este filtro."
               : imgs.length === 0
               ? 'Nenhuma imagem na galeria. Clique em "Enviar Imagens" para começar.'

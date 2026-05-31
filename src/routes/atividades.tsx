@@ -104,6 +104,7 @@ interface Anexo {
 
 const emptyForm = {
   projetoId: "",
+  titulo: "",
   data: "",
   tipo: "",
   descricao: "",
@@ -129,6 +130,7 @@ const intOrUndef = (s: string) => {
 
 const toFormState = (a: AtividadeFull): FormState => ({
   projetoId: a.projetoId,
+  titulo: a.titulo ?? "",
   data: a.data,
   tipo: a.tipo,
   descricao: a.descricao,
@@ -253,12 +255,13 @@ function AtividadesPage() {
   };
 
   const handleSave = async () => {
-    if (!form.projetoId || !form.data || !form.tipo || !form.descricao) {
-      toast.error("Preencha Projeto, Data, Tipo de Ação e Descrição.");
+    if (!form.projetoId || !form.titulo || !form.data || !form.tipo || !form.descricao) {
+      toast.error("Preencha Projeto, Título da Atividade, Data, Tipo de Ação e Descrição.");
       return;
     }
     const payload = {
       projetoId: form.projetoId,
+      titulo: form.titulo,
       data: form.data,
       tipo: form.tipo,
       descricao: form.descricao,
@@ -402,11 +405,16 @@ function AtividadesPage() {
                           </Button>
                         </div>
                       </div>
-                      <p className="text-sm">{a.descricao}</p>
+                      <div className="mt-1">
+                        {a.titulo && (
+                          <h4 className="font-semibold text-sm leading-snug mb-1">{a.titulo}</h4>
+                        )}
+                        <p className="text-sm text-muted-foreground">{a.descricao}</p>
+                      </div>
                       <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1">
                           <MapPin className="h-3 w-3" />
-                          {a.local}
+                          {a.municipio ? `${a.municipio} — ${a.local}` : a.local}
                         </span>
                         <span className="inline-flex items-center gap-1">
                           <User className="h-3 w-3" />
@@ -485,6 +493,14 @@ function AtividadesPage() {
                   )}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="md:col-span-2">
+              <Label>Título da Atividade *</Label>
+              <Input
+                value={form.titulo}
+                onChange={(e) => setF("titulo")(e.target.value)}
+                placeholder="Ex: Construção de Cisterna"
+              />
             </div>
             <div>
               <Label>Data da Atividade *</Label>

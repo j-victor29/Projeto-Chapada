@@ -90,6 +90,7 @@ interface Anexo {
 
 const emptyForm = {
   projetoId: "",
+  titulo: "",
   data: "",
   tipo: "",
   descricao: "",
@@ -115,6 +116,7 @@ const intOrUndef = (s: string) => {
 
 const toFormState = (a: AtividadeFull): FormState => ({
   projetoId: "",
+  titulo: a.titulo ?? "",
   data: a.data,
   tipo: a.tipo,
   descricao: a.descricao,
@@ -233,12 +235,13 @@ function AcoesIndependentesPage() {
   };
 
   const handleSave = async () => {
-    if (!form.data || !form.tipo || !form.descricao) {
-      toast.error("Preencha Data, Tipo de Ação e Descrição.");
+    if (!form.titulo || !form.data || !form.tipo || !form.descricao) {
+      toast.error("Preencha Título da Ação, Data, Tipo de Ação e Descrição.");
       return;
     }
     const payload = {
       projetoId: "", // Always empty/null for independent actions
+      titulo: form.titulo,
       data: form.data,
       tipo: form.tipo,
       descricao: form.descricao,
@@ -380,11 +383,16 @@ function AcoesIndependentesPage() {
                           </Button>
                         </div>
                       </div>
-                      <p className="text-sm">{a.descricao}</p>
+                      <div className="mt-1">
+                        {a.titulo && (
+                          <h4 className="font-semibold text-sm leading-snug mb-1">{a.titulo}</h4>
+                        )}
+                        <p className="text-sm text-muted-foreground">{a.descricao}</p>
+                      </div>
                       <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1">
                           <MapPin className="h-3 w-3" />
-                          {a.local}
+                          {a.municipio ? `${a.municipio} — ${a.local}` : a.local}
                         </span>
                         <span className="inline-flex items-center gap-1">
                           <User className="h-3 w-3" />
@@ -445,6 +453,14 @@ function AcoesIndependentesPage() {
           </DialogHeader>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <Label>Título da Ação *</Label>
+              <Input
+                value={form.titulo}
+                onChange={(e) => setF("titulo")(e.target.value)}
+                placeholder="Ex: Oficina de Agroecologia"
+              />
+            </div>
             <div>
               <Label>Data da Atividade *</Label>
               <Input

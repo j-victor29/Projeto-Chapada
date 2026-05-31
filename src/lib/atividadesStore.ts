@@ -14,6 +14,7 @@ export interface AtividadeIndicadores {
 export interface AtividadeFull {
   id: string;
   projetoId: string;
+  titulo?: string;
   data: string; // ISO date
   tipo: string;
   descricao: string;
@@ -63,6 +64,7 @@ function rowToAtividade(row: any): AtividadeFull {
   return {
     id: row.id,
     projetoId: row.projeto_id ?? "",
+    titulo: row.titulo ?? "",
     data: row.data ?? "",
     tipo: row.tipo ?? "",
     descricao: row.descricao ?? "",
@@ -123,6 +125,7 @@ export const addAtividade = async (
     .from("atividades")
     .insert({
       projeto_id: a.projetoId || null,
+      titulo: a.titulo || null,
       data: a.data,
       tipo: a.tipo,
       descricao: a.descricao,
@@ -157,6 +160,7 @@ export const updateAtividade = async (
 ) => {
   const updatePayload: Record<string, unknown> = {};
   if (patch.projetoId !== undefined) updatePayload.projeto_id = patch.projetoId || null;
+  if (patch.titulo !== undefined) updatePayload.titulo = patch.titulo || null;
   if (patch.data !== undefined) updatePayload.data = patch.data;
   if (patch.tipo !== undefined) updatePayload.tipo = patch.tipo;
   if (patch.descricao !== undefined) updatePayload.descricao = patch.descricao;

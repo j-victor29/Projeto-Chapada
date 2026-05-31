@@ -42,7 +42,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -91,9 +91,10 @@ export const Route = createFileRoute("/projetos")({
   ),
 });
 
-const STATUS: ProjetoStatus[] = ["Em execução", "Concluído", "Suspenso"];
+const STATUS: ProjetoStatus[] = ["Planejamento", "Em execução", "Concluído", "Suspenso"];
 
 const statusVariant: Record<ProjetoStatus, string> = {
+  Planejamento: "bg-ocre/20 text-ocre-foreground border-ocre/30",
   "Em execução": "bg-savanna/15 text-savanna border-savanna/30",
   Concluído: "bg-primary/10 text-primary border-primary/30",
   Suspenso: "bg-terracotta/15 text-terracotta border-terracotta/30",
@@ -107,6 +108,7 @@ const emptyProjeto: Omit<ProjetoDB, "id"> = {
   termino: "",
   valor: 0,
   municipios: [],
+  comunidadesAtendidas: [],
   publicoQuant: 0,
   publicoCaract: "",
   status: "Em execução",
@@ -128,6 +130,29 @@ function ProjetosPage() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<EditingState>(emptyProjeto);
   const editingOwnership = useOwnership("projeto", editing.id ?? "");
+
+  const [newComunidade, setNewComunidade] = useState("");
+
+  const addComunidadeTag = () => {
+    const text = newComunidade.trim();
+    if (!text) return;
+    if (editing.comunidadesAtendidas?.includes(text)) {
+      setNewComunidade("");
+      return;
+    }
+    setEditing((prev) => ({
+      ...prev,
+      comunidadesAtendidas: [...(prev.comunidadesAtendidas ?? []), text],
+    }));
+    setNewComunidade("");
+  };
+
+  const removeComunidadeTag = (c: string) => {
+    setEditing((prev) => ({
+      ...prev,
+      comunidadesAtendidas: (prev.comunidadesAtendidas ?? []).filter((x) => x !== c),
+    }));
+  };
 
   const filtered = useMemo(() => {
     const gq = globalQuery.trim().toLowerCase();
@@ -304,25 +329,65 @@ function ProjetosPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="md:col-span-2">
-                <Label>Municípios / Comunidades Atendidos</Label>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {dbMunicipios.map((m) => {
-                    const sel = editing.municipios.includes(m.nome);
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => toggleMun(m.nome)}
-                        className={`px-3 py-1 rounded-full text-xs border transition-colors ${sel
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-background hover:bg-accent border-border"
-                          }`}
-                      >
-                        {m.nome}
-                      </button>
-                    );
-                  })}
+              <div className="md:col-span-2 space-y-4">
+                <div>
+                  <Label>Municípios Atendidos</Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {dbMunicipios.map((m) => {
+                      const sel = editing.municipios?.includes(m.nome) ?? false;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => toggleMun(m.nome)}
+                          className={`px-3 py-1 rounded-full text-xs border transition-colors ${sel
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background hover:bg-accent border-border"
+                            }`}
+                        >
+                          {m.nome}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <Label>Comunidades Atendidas</Label>
+                  <div className="flex gap-2 mt-2">
+                    <Input
+                      value={newComunidade}
+                      onChange={(e) => setNewComunidade(e.target.value)}
+                      placeholder="Adicionar comunidade (ex: Quilombo Conceição)"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addComunidadeTag();
+                        }
+                      }}
+                      className="text-xs"
+                    />
+                    <Button type="button" onClick={addComunidadeTag} variant="outline" className="shrink-0 h-9">
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mt-2.5">
+                    {(editing.comunidadesAtendidas ?? []).map((c, idx) => (
+                      <Badge key={idx} variant="secondary" className="gap-1 px-2.5 py-1 text-xs font-medium">
+                        {c}
+                        <button
+                          type="button"
+                          onClick={() => removeComunidadeTag(c)}
+                          className="hover:text-destructive text-muted-foreground ml-0.5"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </Badge>
+                    ))}
+                    {(editing.comunidadesAtendidas ?? []).length === 0 && (
+                      <span className="text-xs text-muted-foreground italic">Nenhuma comunidade cadastrada</span>
+                    )}
+                  </div>
                 </div>
               </div>
               <div>
@@ -431,6 +496,7 @@ function ProjetosPage() {
                 <TableHead>Vigência</TableHead>
                 <TableHead>Valor</TableHead>
                 <TableHead>Municípios</TableHead>
+                <TableHead>Comunidades</TableHead>
                 <TableHead>Público</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -439,7 +505,7 @@ function ProjetosPage() {
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
                     {projetos.length === 0
                       ? "Carregando projetos..."
                       : "Nenhum projeto encontrado com os filtros selecionados."}
@@ -494,6 +560,23 @@ function ProjetosPage() {
                           <Badge variant="secondary" className="text-[10px]">
                             +{p.municipios.length - 2}
                           </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1 max-w-48">
+                        {(p.comunidadesAtendidas ?? []).slice(0, 2).map((c) => (
+                          <Badge key={c} variant="outline" className="text-[10px]">
+                            {c}
+                          </Badge>
+                        ))}
+                        {(p.comunidadesAtendidas ?? []).length > 2 && (
+                          <Badge variant="outline" className="text-[10px]">
+                            +{(p.comunidadesAtendidas ?? []).length - 2}
+                          </Badge>
+                        )}
+                        {(p.comunidadesAtendidas ?? []).length === 0 && (
+                          <span className="text-[10px] text-muted-foreground/60 italic">—</span>
                         )}
                       </div>
                     </TableCell>
