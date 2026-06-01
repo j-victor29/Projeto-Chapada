@@ -62,6 +62,21 @@ export interface Familia {
   updated_at?: string;
 }
 
+export interface LinhaAcao {
+  id: string;
+  nome: string;
+  ativo?: boolean;
+  created_at?: string;
+}
+
+export interface CatalogoTecnologia {
+  id: string;
+  nome: string;
+  linha_acao: string;
+  ativo?: boolean;
+  created_at?: string;
+}
+
 function makeCrud<T extends { id: string }>(
   table: string,
   key: string,
@@ -146,3 +161,104 @@ export const Financiadores = makeCrud<Financiador>("financiadores", "financiador
 export const Categorias = makeCrud<Categoria>("categorias", "categorias");
 export const Publicos = makeCrud<Publico>("publicos", "publicos");
 export const Familias = makeCrud<Familia>("beneficiarios", "familias", "nome_responsavel");
+
+// ─── Linhas de Ação ──────────────────────────────────────────────────────────
+export const LinhasAcao = {
+  useList: () =>
+    useQuery({
+      queryKey: ["linhas_acao"] as const,
+      queryFn: async (): Promise<LinhaAcao[]> => {
+        const { data, error } = await supabase
+          .from("linhas_acao")
+          .select("*")
+          .eq("ativo", true)
+          .order("nome");
+        if (error) throw error;
+        return (data ?? []) as LinhaAcao[];
+      },
+    }),
+
+  useCreate: () => {
+    const qc = useQueryClient();
+    return useMutation({
+      mutationFn: async (nome: string) => {
+        const { data, error } = await supabase
+          .from("linhas_acao")
+          .insert({ nome })
+          .select("id, nome, ativo")
+          .single();
+        if (error) throw error;
+        return data as LinhaAcao;
+      },
+      onSuccess: () => qc.invalidateQueries({ queryKey: ["linhas_acao"] }),
+    });
+  },
+};
+
+// ─── Catálogo de Tecnologias (tabela tecnologias) ────────────────────────────
+export const CatalogoTecnologias = {
+  useList: () =>
+    useQuery({
+      queryKey: ["catalogo_tecnologias"] as const,
+      queryFn: async (): Promise<CatalogoTecnologia[]> => {
+        const { data, error } = await supabase
+          .from("tecnologias")
+          .select("id, nome, linha_acao, ativo")
+          .order("linha_acao")
+          .order("nome");
+        if (error) throw error;
+        return (data ?? []) as CatalogoTecnologia[];
+      },
+    }),
+
+  useUpsert: () => {
+    const qc = useQueryClient();
+    return useMutation({
+      mutationFn: async (row: Partial<CatalogoTecnologia> & { id?: string }) => {
+        if (row.id) {
+          const { id, created_at, ...rest } = row as any;
+          const { error } = await supabase
+            .from("tecnologias")
+            .update(rest)
+            .eq("id", id);
+          if (error) throw error;
+        } else {
+          const { id, created_at, ...rest } = row as any;
+          const { error } = await supabase
+            .from("tecnologias")
+            .insert({ ...rest, ativo: true });
+          if (error) throw error;
+        }
+      },
+      onSuccess: () => qc.invalidateQueries({ queryKey: ["catalogo_tecnologias"] }),
+    });
+  },
+
+  useDeactivate: () => {
+    const qc = useQueryClient();
+    return useMutation({
+      mutationFn: async (id: string) => {
+        const { error } = await supabase
+          .from("tecnologias")
+          .update({ ativo: false })
+          .eq("id", id);
+        if (error) throw error;
+      },
+      onSuccess: () => qc.invalidateQueries({ queryKey: ["catalogo_tecnologias"] }),
+    });
+  },
+
+  useReactivate: () => {
+    const qc = useQueryClient();
+    return useMutation({
+      mutationFn: async (id: string) => {
+        const { error } = await supabase
+          .from("tecnologias")
+          .update({ ativo: true })
+          .eq("id", id);
+        if (error) throw error;
+      },
+      onSuccess: () => qc.invalidateQueries({ queryKey: ["catalogo_tecnologias"] }),
+    });
+  },
+};

@@ -12,7 +12,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Plus, Trash2, Pencil, Search, X, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Municipios, Comunidades, Financiadores, Categorias, Publicos, Familias
+  Municipios, Comunidades, Financiadores, Categorias, Publicos, Familias,
+  CatalogoTecnologias, LinhasAcao,
 } from "@/lib/cadastrosStore";
 import { toast } from "sonner";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -24,7 +25,7 @@ export const Route = createFileRoute("/cadastros")({
 
 function CadastrosPage() {
   return (
-    <AppLayout title="Cadastros institucionais" subtitle="Municípios, comunidades, financiadores, categorias, públicos e famílias">
+    <AppLayout title="Cadastros institucionais" subtitle="Municípios, comunidades, financiadores, categorias, públicos, famílias e tecnologias">
       <div className="space-y-6">
         <Tabs defaultValue="municipios" className="w-full">
           <TabsList className="flex flex-wrap gap-1">
@@ -34,6 +35,7 @@ function CadastrosPage() {
             <TabsTrigger value="categorias">Categorias</TabsTrigger>
             <TabsTrigger value="publicos">Públicos</TabsTrigger>
             <TabsTrigger value="familias">Famílias</TabsTrigger>
+            <TabsTrigger value="tecnologias">Tecnologias</TabsTrigger>
           </TabsList>
           
           <TabsContent value="municipios" className="mt-4"><MunicipiosTab /></TabsContent>
@@ -42,6 +44,7 @@ function CadastrosPage() {
           <TabsContent value="categorias" className="mt-4"><CategoriasTab /></TabsContent>
           <TabsContent value="publicos" className="mt-4"><PublicosTab /></TabsContent>
           <TabsContent value="familias" className="mt-4"><FamiliasTab /></TabsContent>
+          <TabsContent value="tecnologias" className="mt-4"><TecnologiasTab /></TabsContent>
         </Tabs>
       </div>
     </AppLayout>
@@ -700,5 +703,297 @@ function FamiliasTab() {
       onSave={(s) => upsert.mutateAsync(s)}
       onDelete={(id) => del.mutateAsync(id)}
     />
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ABA TECNOLOGIAS
+// ─────────────────────────────────────────────────────────────────────────────
+
+const BLANK_TECH = { nome: "", linha_acao: "" };
+
+function TecnologiasTab() {
+  const { data: items } = CatalogoTecnologias.useList();
+  const { data: linhas = [] } = LinhasAcao.useList();
+  const upsert = CatalogoTecnologias.useUpsert();
+  const deactivate = CatalogoTecnologias.useDeactivate();
+  const reactivate = CatalogoTecnologias.useReactivate();
+  const createLinha = LinhasAcao.useCreate();
+
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<any>(BLANK_TECH);
+  const [localSearch, setLocalSearch] = useState("");
+  const [linhaFiltro, setLinhaFiltro] = useState("all");
+  const [showInativos, setShowInativos] = useState(false);
+  const [novaLinha, setNovaLinha] = useState("");
+  const [criandoLinha, setCriandoLinha] = useState(false);
+  const search = useDebounce(localSearch, 300);
+
+  const openCreate = () => { setDraft(BLANK_TECH); setNovaLinha(""); setCriandoLinha(false); setOpen(true); };
+  const openEdit = (row: any) => { setDraft({ ...row }); setNovaLinha(""); setCriandoLinha(false); setOpen(true); };
+
+  const linhasUnicas = useMemo(() => {
+    const fromItems = [...new Set((items ?? []).map((t: any) => t.linha_acao).filter(Boolean))];
+    const fromLinhas = linhas.map((l) => l.nome);
+    return [...new Set([...fromLinhas, ...fromItems])].sort();
+  }, [items, linhas]);
+
+  const filteredItems = useMemo(() => {
+    if (!items) return [];
+    return items.filter((row: any) => {
+      const matchesAtivo = showInativos ? true : row.ativo !== false;
+      const matchesLinha = linhaFiltro === "all" || row.linha_acao === linhaFiltro;
+      const lowerSearch = search.toLowerCase().trim();
+      const matchesSearch = !lowerSearch ||
+        (row.nome ?? "").toLowerCase().includes(lowerSearch) ||
+        (row.linha_acao ?? "").toLowerCase().includes(lowerSearch);
+      return matchesAtivo && matchesLinha && matchesSearch;
+    });
+  }, [items, search, linhaFiltro, showInativos]);
+
+  const handleSave = async () => {
+    try {
+      let linhaFinal = draft.linha_acao;
+
+      // Se está criando uma nova linha de ação
+      if (draft.linha_acao === "__nova__") {
+        if (!novaLinha.trim()) {
+          toast.error("Digite o nome da nova Linha de Ação.");
+          return;
+        }
+        const created = await createLinha.mutateAsync(novaLinha.trim());
+        linhaFinal = created.nome;
+      }
+
+      if (!draft.nome?.trim()) {
+        toast.error("O nome da tecnologia é obrigatório.");
+        return;
+      }
+      if (!linhaFinal?.trim()) {
+        toast.error("Selecione ou crie uma Linha de Ação.");
+        return;
+      }
+
+      await upsert.mutateAsync({ ...draft, linha_acao: linhaFinal });
+      toast.success("Tecnologia salva com sucesso!");
+      setOpen(false);
+      setDraft(BLANK_TECH);
+      setNovaLinha("");
+      setCriandoLinha(false);
+    } catch (e: any) {
+      toast.error(e.message ?? "Erro ao salvar a tecnologia");
+    }
+  };
+
+  return (
+    <Card className="border-border/60 hover:shadow-soft transition-shadow">
+      <CardContent className="p-4 md:p-6 space-y-4">
+        {/* Cabeçalho */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <h3 className="font-medium text-lg text-foreground/90">Catálogo de Tecnologias</h3>
+          <div className="flex w-full sm:w-auto items-center gap-2 flex-wrap">
+
+            {/* Busca */}
+            <div className="relative flex-1 sm:w-56">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar..."
+                className="pl-9 bg-muted/20"
+                value={localSearch}
+                onChange={(e) => setLocalSearch(e.target.value)}
+              />
+            </div>
+
+            {/* Filtro por Linha de Ação */}
+            <Select value={linhaFiltro} onValueChange={setLinhaFiltro}>
+              <SelectTrigger className="w-52">
+                <SelectValue placeholder="Filtrar por Linha de Ação" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as Linhas</SelectItem>
+                {linhasUnicas.map((l) => (
+                  <SelectItem key={l} value={l}>{l}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Toggle inativos */}
+            <button
+              type="button"
+              onClick={() => setShowInativos((v) => !v)}
+              className={`text-xs px-3 py-1.5 rounded-md border transition-colors ${
+                showInativos
+                  ? "bg-muted text-foreground border-border"
+                  : "bg-transparent text-muted-foreground border-border/50 hover:border-border"
+              }`}
+            >
+              {showInativos ? "Ocultar inativos" : "Ver inativos"}
+            </button>
+
+            {/* Botão Novo */}
+            <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setDraft(BLANK_TECH); setNovaLinha(""); setCriandoLinha(false); } }}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="gap-1 shadow-sm" onClick={openCreate}>
+                  <Plus className="h-4 w-4" /> Novo
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{draft.id ? "Editar" : "Nova"} Tecnologia</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+
+                  {/* Nome */}
+                  <div className="space-y-1">
+                    <Label htmlFor="tech-nome">Nome da Tecnologia <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="tech-nome"
+                      value={draft.nome ?? ""}
+                      placeholder="Ex.: Cisterna de consumo humano"
+                      onChange={(e) => setDraft({ ...draft, nome: e.target.value })}
+                    />
+                  </div>
+
+                  {/* Linha de Ação */}
+                  <div className="space-y-1">
+                    <Label htmlFor="tech-linha">Linha de Ação <span className="text-destructive">*</span></Label>
+                    <Select
+                      value={draft.linha_acao || undefined}
+                      onValueChange={(v) => {
+                        setDraft({ ...draft, linha_acao: v });
+                        setCriandoLinha(v === "__nova__");
+                        if (v !== "__nova__") setNovaLinha("");
+                      }}
+                    >
+                      <SelectTrigger id="tech-linha">
+                        <SelectValue placeholder="Selecione a linha de ação..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {linhasUnicas.map((l) => (
+                          <SelectItem key={l} value={l}>{l}</SelectItem>
+                        ))}
+                        <SelectItem value="__nova__">➕ Criar nova linha de ação</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Campo inline para nova linha de ação */}
+                  {criandoLinha && (
+                    <div className="space-y-1">
+                      <Label htmlFor="nova-linha">Nome da nova Linha de Ação <span className="text-destructive">*</span></Label>
+                      <Input
+                        id="nova-linha"
+                        value={novaLinha}
+                        placeholder="Ex.: Educação Ambiental"
+                        onChange={(e) => setNovaLinha(e.target.value)}
+                        autoFocus
+                      />
+                      <p className="text-xs text-muted-foreground">Essa categoria será criada e ficará disponível para futuras tecnologias.</p>
+                    </div>
+                  )}
+
+                </div>
+                <DialogFooter className="gap-2 sm:gap-0 mt-4">
+                  <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+                  <Button
+                    onClick={handleSave}
+                    disabled={upsert.isPending || createLinha.isPending}
+                  >
+                    {(upsert.isPending || createLinha.isPending) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Salvar
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+
+        {/* Tabela */}
+        <div className="overflow-x-auto rounded-lg border border-border/50">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/30">
+              <tr className="border-b border-border/50">
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Tecnologia</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Linha de Ação</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
+                <th className="w-24" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/40">
+              {filteredItems.map((row: any) => (
+                <tr key={row.id} className={`hover:bg-muted/20 transition-colors ${row.ativo === false ? "opacity-50" : ""}`}>
+                  <td className="px-4 py-2.5 font-normal text-foreground/80">{row.nome}</td>
+                  <td className="px-4 py-2.5">
+                    <span className="px-2 py-0.5 rounded-full text-[11px] border bg-primary/10 text-primary border-primary/30 font-medium">
+                      {row.linha_acao || "—"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {row.ativo === false ? (
+                      <span className="px-2 py-0.5 rounded-full text-[11px] border bg-muted/60 text-muted-foreground border-border/50 font-medium">Inativa</span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[11px] border bg-emerald-500/10 text-emerald-600 border-emerald-500/30 font-medium">Ativa</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5 text-right whitespace-nowrap space-x-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 hover:bg-muted/80 text-muted-foreground hover:text-foreground"
+                      onClick={() => openEdit(row)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    {row.ativo === false ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Reativar tecnologia"
+                        className="h-8 w-8 hover:bg-emerald-500/10 text-muted-foreground hover:text-emerald-600"
+                        onClick={async () => {
+                          try {
+                            await reactivate.mutateAsync(row.id);
+                            toast.success("Tecnologia reativada com sucesso!");
+                          } catch (e: any) {
+                            toast.error(e.message ?? "Erro ao reativar");
+                          }
+                        }}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Desativar tecnologia (não exclui o histórico)"
+                        className="h-8 w-8 hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                        onClick={async () => {
+                          if (!confirm(`Desativar "${row.nome}"? Ela deixará de aparecer no select de /tecnologias, mas o histórico de registros será preservado.`)) return;
+                          try {
+                            await deactivate.mutateAsync(row.id);
+                            toast.success("Tecnologia desativada. O histórico foi preservado.");
+                          } catch (e: any) {
+                            toast.error(e.message ?? "Erro ao desativar");
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {filteredItems.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-4 py-12 text-center text-muted-foreground">
+                    Nenhuma tecnologia encontrada
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

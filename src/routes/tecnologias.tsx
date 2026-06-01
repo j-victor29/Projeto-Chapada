@@ -139,6 +139,7 @@ function TecnologiasPage() {
     const { data, error } = await supabase
       .from("tecnologias")
       .select("id, nome, linha_acao")
+      .eq("ativo", true)
       .order("linha_acao")
       .order("nome");
     if (error) {
