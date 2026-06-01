@@ -1,1 +1,1 @@
-atualizado no dia 30/05/2026 às 13:23h
+atualizado no dia 01/06/2026 às 00:24h
