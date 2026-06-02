@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState, lazy, Suspense } from "react";
+import { useMemo, useState, lazy, Suspense, useRef, useEffect, useCallback } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -42,7 +42,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, Search, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, X, Loader2, Check, Star } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -50,7 +50,7 @@ import {
   formatDate,
   type ProjetoStatus,
 } from "@/lib/mockData";
-import { Financiadores, Municipios } from "@/lib/cadastrosStore";
+import { Financiadores, Municipios, Comunidades } from "@/lib/cadastrosStore";
 import { calcVigenciaProgress } from "@/lib/progress";
 import { toast } from "sonner";
 import { useGlobalSearch } from "@/contexts/SearchContext";
@@ -73,6 +73,10 @@ import {
   deleteProjeto,
   type ProjetoDB,
 } from "@/lib/projetosStore";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
+import { useComunidadesAutocomplete, useIbgeAutocomplete, useFavoritos } from "@/lib/autocompleteHooks";
 
 export const Route = createFileRoute("/projetos")({
   component: () => (
@@ -116,10 +120,24 @@ const emptyProjeto: Omit<ProjetoDB, "id"> = {
 
 type EditingState = Omit<ProjetoDB, "id"> & { id?: string };
 
+// ─── Utilitário: Title Case ──────────────────────────────────────────────────
+function toTitleCase(str: string): string {
+  return str
+    .trim()
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+
+
 function ProjetosPage() {
   const projetos = useProjetos();
   const { data: dbFinanciadores = [] } = Financiadores.useList();
   const { data: dbMunicipios = [] } = Municipios.useList();
+  const queryClient = useQueryClient();
+
+  const { favoritos, toggleFavorito, isFavorito } = useFavoritos();
+
   const [search, setSearch] = useState("");
   const { query: globalQuery } = useGlobalSearch();
   const { email: currentEmail, name: currentName } = useCurrentUser();
@@ -131,21 +149,261 @@ function ProjetosPage() {
   const [editing, setEditing] = useState<EditingState>(emptyProjeto);
   const editingOwnership = useOwnership("projeto", editing.id ?? "");
 
-  const [newComunidade, setNewComunidade] = useState("");
+  // ── Estado: Financiadora inline ──────────────────────────────────────────
+  const [showNewFinanciador, setShowNewFinanciador] = useState(false);
+  const [newFinanciadorNome, setNewFinanciadorNome] = useState("");
+  const [savingFinanciador, setSavingFinanciador] = useState(false);
 
-  const addComunidadeTag = () => {
-    const text = newComunidade.trim();
-    if (!text) return;
-    if (editing.comunidadesAtendidas?.includes(text)) {
-      setNewComunidade("");
-      return;
+  // ── Estado: Comunidades autocomplete ────────────────────────────────────
+  const [comunidadeInput, setComunidadeInput] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [savingComunidade, setSavingComunidade] = useState(false);
+  const comunidadeInputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+  const { suggestions: comunidadeSuggestions, loading: comunidadeLoading } =
+    useComunidadesAutocomplete(comunidadeInput);
+
+  const displayComSuggestions = useMemo(() => {
+    if (comunidadeInput.trim().length < 2) {
+      const favNomes = favoritos.filter((f: any) => f.tipo === "comunidade").map((f: any) => f.item_nome);
+      return favNomes.map((nome: string) => ({ id: nome, nome }));
     }
+    return [...comunidadeSuggestions].sort((a: any, b: any) => {
+      const aFav = isFavorito("comunidade", a.nome);
+      const bFav = isFavorito("comunidade", b.nome);
+      if (aFav && !bFav) return -1;
+      if (!aFav && bFav) return 1;
+      return 0;
+    });
+  }, [comunidadeInput, comunidadeSuggestions, favoritos, isFavorito]);
+
+  // ── Estado: Municípios autocomplete ───────────────────────────────────────
+  const [municipioInput, setMunicipioInput] = useState("");
+  const [showMunSuggestions, setShowMunSuggestions] = useState(false);
+  const [savingMunicipio, setSavingMunicipio] = useState(false);
+  const municipioInputRef = useRef<HTMLInputElement>(null);
+  const munSuggestionsRef = useRef<HTMLDivElement>(null);
+  const { suggestions: munSuggestions, loading: munLoading } =
+    useIbgeAutocomplete(municipioInput);
+
+  const displayMunSuggestions = useMemo(() => {
+    if (municipioInput.trim().length < 2) {
+      const favNomes = favoritos.filter((f: any) => f.tipo === "municipio").map((f: any) => f.item_nome);
+      if (favNomes.length === 0) return [];
+      return favNomes.map((nome: string) => {
+        const found = dbMunicipios.find((m: any) => m.nome.toLowerCase() === nome.toLowerCase());
+        if (found) {
+          return {
+            id: found.codigo_ibge,
+            nome: found.nome,
+            microrregiao: { mesorregiao: { UF: { sigla: found.uf } } }
+          };
+        }
+        return { id: nome, nome: nome, microrregiao: { mesorregiao: { UF: { sigla: "" } } } };
+      });
+    }
+    return [...munSuggestions].sort((a: any, b: any) => {
+      const aFav = isFavorito("municipio", a.nome);
+      const bFav = isFavorito("municipio", b.nome);
+      if (aFav && !bFav) return -1;
+      if (!aFav && bFav) return 1;
+      return 0;
+    });
+  }, [municipioInput, munSuggestions, favoritos, dbMunicipios, isFavorito]);
+
+  // Fecha dropdown ao clicar fora
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        comunidadeInputRef.current &&
+        !comunidadeInputRef.current.contains(e.target as Node) &&
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+      if (
+        municipioInputRef.current &&
+        !municipioInputRef.current.contains(e.target as Node) &&
+        munSuggestionsRef.current &&
+        !munSuggestionsRef.current.contains(e.target as Node)
+      ) {
+        setShowMunSuggestions(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // ── Salvar nova Financiadora ────────────────────────────────────────────
+  const saveNewFinanciador = async () => {
+    const normalized = toTitleCase(newFinanciadorNome);
+    if (!normalized) return;
+
+    setSavingFinanciador(true);
+    try {
+      // 1. Verificar duplicata (case-insensitive)
+      const { data: existing } = await supabase
+        .from("financiadores")
+        .select("id, nome")
+        .ilike("nome", normalized)
+        .limit(1);
+
+      let financiadorId: string;
+      let financiadorNome: string;
+
+      if (existing && existing.length > 0) {
+        // Já existe — vincular ao existente
+        financiadorId = existing[0].id;
+        financiadorNome = existing[0].nome;
+        toast.info(`Instituição "${financiadorNome}" já existe — selecionada automaticamente.`);
+      } else {
+        // Nova — inserir
+        const { data: inserted, error } = await supabase
+          .from("financiadores")
+          .insert({ nome: normalized })
+          .select("id, nome")
+          .single();
+
+        if (error || !inserted) throw error ?? new Error("Falha ao salvar instituição.");
+        financiadorId = inserted.id;
+        financiadorNome = inserted.nome;
+        toast.success(`Instituição "${financiadorNome}" adicionada com sucesso.`);
+      }
+
+      // Invalidar cache e selecionar no form
+      await queryClient.invalidateQueries({ queryKey: ["financiadores"] });
+      setEditing((prev) => ({
+        ...prev,
+        financiadorId,
+        financiador: financiadorNome,
+      }));
+      setShowNewFinanciador(false);
+      setNewFinanciadorNome("");
+    } catch (err: any) {
+      toast.error(`Erro ao salvar instituição: ${err.message}`);
+    } finally {
+      setSavingFinanciador(false);
+    }
+  };
+
+  // ── Adicionar Município (IBGE) ──────────────────────────────────────────
+  const addMunicipio = useCallback(
+    async (mun: any) => {
+      const ufSigla = mun.microrregiao?.mesorregiao?.UF?.sigla || "";
+      const microNome = mun.microrregiao?.nome || "";
+      const codigoIbge = String(mun.id);
+      const nomeMun = mun.nome;
+
+      if ((editing.municipios ?? []).includes(nomeMun)) {
+        toast.info("Município já adicionado ao projeto.");
+        setMunicipioInput("");
+        setShowMunSuggestions(false);
+        return;
+      }
+
+      setSavingMunicipio(true);
+      try {
+        // Verificar se existe na tabela local
+        const exists = dbMunicipios.find(
+          (m) => m.codigo_ibge === codigoIbge || m.nome.toLowerCase() === nomeMun.toLowerCase()
+        );
+
+        if (!exists) {
+          // Salvar na tabela municipios
+          await supabase.from("municipios").insert({
+            nome: nomeMun,
+            uf: ufSigla,
+            regiao: microNome,
+            codigo_ibge: codigoIbge,
+          });
+          await queryClient.invalidateQueries({ queryKey: ["municipios"] });
+        }
+
+        setEditing((prev) => ({
+          ...prev,
+          municipios: [...(prev.municipios ?? []), nomeMun],
+        }));
+
+        setMunicipioInput("");
+        setShowMunSuggestions(false);
+      } catch (err: any) {
+        toast.error(`Erro ao adicionar município: ${err.message}`);
+      } finally {
+        setSavingMunicipio(false);
+      }
+    },
+    [editing.municipios, dbMunicipios, queryClient]
+  );
+
+  const removeMunicipioTag = (m: string) => {
     setEditing((prev) => ({
       ...prev,
-      comunidadesAtendidas: [...(prev.comunidadesAtendidas ?? []), text],
+      municipios: (prev.municipios ?? []).filter((x) => x !== m),
     }));
-    setNewComunidade("");
   };
+
+  // ── Adicionar Comunidade (autocomplete/nova) ─────────────────────────────
+  const addComunidade = useCallback(
+    async (nomeRaw: string) => {
+      const normalized = toTitleCase(nomeRaw);
+      if (!normalized) return;
+
+      // Verificar se já está na lista de selecionadas
+      if ((editing.comunidadesAtendidas ?? []).includes(normalized)) {
+        toast.info("Comunidade já adicionada ao projeto.");
+        setComunidadeInput("");
+        setShowSuggestions(false);
+        return;
+      }
+
+      setSavingComunidade(true);
+      try {
+        // Verificar se existe no banco
+        const { data: existing } = await supabase
+          .from("comunidades")
+          .select("id, nome")
+          .ilike("nome", normalized)
+          .limit(1);
+
+        if (existing && existing.length > 0) {
+          // Existe — vincular ao existente (sem criar duplicata)
+          toast.info(
+            `Comunidade já cadastrada — vinculando ao registro existente.`,
+            { duration: 2000 }
+          );
+          setEditing((prev) => ({
+            ...prev,
+            comunidadesAtendidas: [...(prev.comunidadesAtendidas ?? []), existing[0].nome],
+          }));
+        } else {
+          // Nova — salvar no banco com criado_via: "projeto"
+          const { data: inserted, error } = await supabase
+            .from("comunidades")
+            .insert({ nome: normalized, criado_via: "projeto" })
+            .select("id, nome")
+            .single();
+
+          if (error || !inserted) throw error ?? new Error("Falha ao salvar comunidade.");
+
+          // Invalidar cache de comunidades
+          await queryClient.invalidateQueries({ queryKey: ["comunidades"] });
+          setEditing((prev) => ({
+            ...prev,
+            comunidadesAtendidas: [...(prev.comunidadesAtendidas ?? []), inserted.nome],
+          }));
+        }
+
+        setComunidadeInput("");
+        setShowSuggestions(false);
+      } catch (err: any) {
+        toast.error(`Erro ao adicionar comunidade: ${err.message}`);
+      } finally {
+        setSavingComunidade(false);
+      }
+    },
+    [editing.comunidadesAtendidas, queryClient]
+  );
 
   const removeComunidadeTag = (c: string) => {
     setEditing((prev) => ({
@@ -175,11 +433,17 @@ function ProjetosPage() {
 
   const openNew = () => {
     setEditing({ ...emptyProjeto });
+    setShowNewFinanciador(false);
+    setNewFinanciadorNome("");
+    setComunidadeInput("");
     setOpen(true);
   };
   const openEdit = (p: ProjetoDB) => {
     if (!canEdit("projeto", p.id, currentEmail)) { denyToast(); return; }
     setEditing(p);
+    setShowNewFinanciador(false);
+    setNewFinanciadorNome("");
+    setComunidadeInput("");
     setOpen(true);
   };
 
@@ -219,14 +483,6 @@ function ProjetosPage() {
     }
   };
 
-  const toggleMun = (m: string) => {
-    setEditing((e) =>
-      e.municipios.includes(m)
-        ? { ...e, municipios: e.municipios.filter((x) => x !== m) }
-        : { ...e, municipios: [...e.municipios, m] }
-    );
-  };
-
   return (
     <AppLayout
       title="Projetos"
@@ -257,11 +513,18 @@ function ProjetosPage() {
                   onChange={(e) => setEditing({ ...editing, contrato: e.target.value })}
                 />
               </div>
+
+              {/* ── FINANCIADORA ──────────────────────────────────────────── */}
               <div>
                 <Label>Instituição Financiadora</Label>
                 <Select
-                  value={editing.financiadorId || undefined}
+                  value={showNewFinanciador ? "__add_new__" : (editing.financiadorId || undefined)}
                   onValueChange={(v) => {
+                    if (v === "__add_new__") {
+                      setShowNewFinanciador(true);
+                      return;
+                    }
+                    setShowNewFinanciador(false);
                     const selectedFin = dbFinanciadores.find((f) => f.id === v);
                     setEditing({
                       ...editing,
@@ -283,9 +546,56 @@ function ProjetosPage() {
                     ) : (
                       <SelectItem value="none" disabled>Nenhum financiador</SelectItem>
                     )}
+                    <SelectItem value="__add_new__" className="text-primary font-medium border-t mt-1 pt-2">
+                      <span className="flex items-center gap-1.5">
+                        <Plus className="h-3.5 w-3.5" />
+                        Adicionar nova instituição
+                      </span>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
+
+                {/* Campo inline para nova financiadora */}
+                {showNewFinanciador && (
+                  <div className="mt-2 flex gap-2 items-center animate-in slide-in-from-top-1 duration-150">
+                    <Input
+                      autoFocus
+                      placeholder="Nome da instituição"
+                      value={newFinanciadorNome}
+                      onChange={(e) => setNewFinanciadorNome(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") { e.preventDefault(); saveNewFinanciador(); }
+                        if (e.key === "Escape") { setShowNewFinanciador(false); setNewFinanciadorNome(""); }
+                      }}
+                      className="text-sm flex-1"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={saveNewFinanciador}
+                      disabled={savingFinanciador || !newFinanciadorNome.trim()}
+                      className="shrink-0 gap-1.5"
+                    >
+                      {savingFinanciador ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Check className="h-3.5 w-3.5" />
+                      )}
+                      Salvar
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-9 w-9 shrink-0"
+                      onClick={() => { setShowNewFinanciador(false); setNewFinanciadorNome(""); }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
+
               <div>
                 <Label>Data de Início</Label>
                 <Input
@@ -306,9 +616,7 @@ function ProjetosPage() {
                 <Label>Valor Total (R$)</Label>
                 <CurrencyInput
                   value={editing.valor}
-                  onChange={(v) =>
-                    setEditing({ ...editing, valor: v || 0 })
-                  }
+                  onChange={(v) => setEditing({ ...editing, valor: v || 0 })}
                 />
               </div>
               <div>
@@ -322,70 +630,229 @@ function ProjetosPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {STATUS.map((s) => (
-                      <SelectItem key={s} value={s}>
-                        {s}
-                      </SelectItem>
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="md:col-span-2 space-y-4">
+                {/* ── MUNICÍPIOS — Autocomplete IBGE ──────────────────────────── */}
                 <div>
                   <Label>Municípios Atendidos</Label>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {dbMunicipios.map((m) => {
-                      const sel = editing.municipios?.includes(m.nome) ?? false;
+                  <div className="relative mt-2">
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Input
+                          ref={municipioInputRef}
+                          value={municipioInput}
+                          onChange={(e) => {
+                            setMunicipioInput(e.target.value);
+                            setShowMunSuggestions(true);
+                          }}
+                          onFocus={() => setShowMunSuggestions(true)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Escape") setShowMunSuggestions(false);
+                          }}
+                          placeholder="Buscar município (ex: Araripina)..."
+                          className="text-xs pr-8"
+                        />
+                        {munLoading && (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Dropdown de sugestões IBGE */}
+                    {showMunSuggestions && (
+                      <div
+                        ref={munSuggestionsRef}
+                        className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg overflow-hidden max-h-60 overflow-y-auto"
+                      >
+                        {displayMunSuggestions.length > 0 ? (
+                          displayMunSuggestions.map((m: any) => {
+                            const ufSigla = m.microrregiao?.mesorregiao?.UF?.sigla || "";
+                            const isFav = isFavorito("municipio", m.nome);
+                            return (
+                              <button
+                                key={m.id}
+                                type="button"
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-accent transition-colors flex items-center justify-between"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  addMunicipio(m);
+                                }}
+                              >
+                                <span className="flex items-center gap-2">
+                                  {isFav ? (
+                                    <Star className="h-3.5 w-3.5 fill-primary text-primary shrink-0" />
+                                  ) : (
+                                    <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                  )}
+                                  <span className="font-medium">{m.nome}</span>
+                                  {ufSigla && <span className="text-muted-foreground">— {ufSigla}</span>}
+                                </span>
+                              </button>
+                            );
+                          })
+                        ) : municipioInput.trim().length >= 2 && !munLoading ? (
+                          <div className="px-3 py-2 text-xs text-muted-foreground">
+                            Nenhum município encontrado.
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tags dos municípios selecionados */}
+                  <div className="flex flex-wrap gap-1.5 mt-2.5">
+                    {(editing.municipios ?? []).map((m, idx) => {
+                      const isFav = isFavorito("municipio", m);
                       return (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => toggleMun(m.nome)}
-                          className={`px-3 py-1 rounded-full text-xs border transition-colors ${sel
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-background hover:bg-accent border-border"
-                            }`}
-                        >
-                          {m.nome}
-                        </button>
+                        <Badge key={idx} variant="secondary" className="gap-1 px-2.5 py-1 text-xs font-medium">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleFavorito({ tipo: "municipio", item_nome: m, isFavorito: isFav }); }}
+                            className="mr-0.5"
+                          >
+                            <Star className={`h-3.5 w-3.5 transition-colors ${isFav ? 'fill-primary text-primary' : 'text-muted-foreground hover:text-primary'}`} />
+                          </button>
+                          {m}
+                          <button
+                            type="button"
+                            onClick={() => removeMunicipioTag(m)}
+                            className="hover:text-destructive text-muted-foreground ml-0.5"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </Badge>
                       );
                     })}
+                    {(editing.municipios ?? []).length === 0 && (
+                      <span className="text-xs text-muted-foreground italic">Nenhum município vinculado a este projeto</span>
+                    )}
                   </div>
                 </div>
 
+                {/* ── COMUNIDADES — Campo Híbrido ──────────────────────────── */}
                 <div>
                   <Label>Comunidades Atendidas</Label>
-                  <div className="flex gap-2 mt-2">
-                    <Input
-                      value={newComunidade}
-                      onChange={(e) => setNewComunidade(e.target.value)}
-                      placeholder="Adicionar comunidade (ex: Quilombo Conceição)"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          addComunidadeTag();
-                        }
-                      }}
-                      className="text-xs"
-                    />
-                    <Button type="button" onClick={addComunidadeTag} variant="outline" className="shrink-0 h-9">
-                      <Plus className="h-4 w-4" />
-                    </Button>
+                  <div className="relative mt-2">
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Input
+                          ref={comunidadeInputRef}
+                          value={comunidadeInput}
+                          onChange={(e) => {
+                            setComunidadeInput(e.target.value);
+                            setShowSuggestions(true);
+                          }}
+                          onFocus={() => setShowSuggestions(true)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              if (comunidadeInput.trim()) addComunidade(comunidadeInput);
+                            }
+                            if (e.key === "Escape") setShowSuggestions(false);
+                          }}
+                          placeholder="Digite para buscar ou criar comunidade..."
+                          className="text-xs pr-8"
+                        />
+                        {comunidadeLoading && (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Dropdown de sugestões */}
+                    {showSuggestions && (
+                      <div
+                        ref={suggestionsRef}
+                        className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg overflow-hidden"
+                      >
+                        {displayComSuggestions.length > 0 ? (
+                          displayComSuggestions.map((s: any) => {
+                            const isFav = isFavorito("comunidade", s.nome);
+                            return (
+                              <button
+                                key={s.id}
+                                type="button"
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-accent transition-colors flex items-center gap-2"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  addComunidade(s.nome);
+                                }}
+                              >
+                                {isFav ? (
+                                  <Star className="h-3.5 w-3.5 fill-primary text-primary shrink-0" />
+                                ) : (
+                                  <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                )}
+                                {s.nome}
+                              </button>
+                            );
+                          })
+                        ) : comunidadeInput.trim().length >= 2 && !comunidadeLoading ? (
+                          <button
+                            type="button"
+                            className="w-full text-left px-3 py-2 text-xs hover:bg-primary/5 transition-colors flex items-center gap-2 text-primary border-t border-border"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              addComunidade(comunidadeInput);
+                            }}
+                          >
+                            <Plus className="h-3 w-3 shrink-0" />
+                            Criar "{toTitleCase(comunidadeInput)}"
+                          </button>
+                        ) : comunidadeInput.trim().length < 2 && (
+                          <div className="px-3 py-2 text-xs text-muted-foreground italic">
+                            Comece a digitar para buscar comunidades...
+                          </div>
+                        )}
+                        {comunidadeInput.trim().length >= 2 && displayComSuggestions.length > 0 && !displayComSuggestions.some((s: any) => s.nome.toLowerCase() === comunidadeInput.trim().toLowerCase()) && (
+                          <button
+                            type="button"
+                            className="w-full text-left px-3 py-2 text-xs hover:bg-primary/5 transition-colors flex items-center gap-2 text-primary border-t border-border"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              addComunidade(comunidadeInput);
+                            }}
+                          >
+                            <Plus className="h-3 w-3 shrink-0" />
+                            Criar "{toTitleCase(comunidadeInput)}"
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+
                   </div>
+
+                  {/* Tags das comunidades selecionadas */}
                   <div className="flex flex-wrap gap-1.5 mt-2.5">
-                    {(editing.comunidadesAtendidas ?? []).map((c, idx) => (
-                      <Badge key={idx} variant="secondary" className="gap-1 px-2.5 py-1 text-xs font-medium">
-                        {c}
-                        <button
-                          type="button"
-                          onClick={() => removeComunidadeTag(c)}
-                          className="hover:text-destructive text-muted-foreground ml-0.5"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </Badge>
-                    ))}
+                    {(editing.comunidadesAtendidas ?? []).map((c, idx) => {
+                      const isFav = isFavorito("comunidade", c);
+                      return (
+                        <Badge key={idx} variant="secondary" className="gap-1 px-2.5 py-1 text-xs font-medium">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleFavorito({ tipo: "comunidade", item_nome: c, isFavorito: isFav }); }}
+                            className="mr-0.5"
+                          >
+                            <Star className={`h-3.5 w-3.5 transition-colors ${isFav ? 'fill-primary text-primary' : 'text-muted-foreground hover:text-primary'}`} />
+                          </button>
+                          {c}
+                          <button
+                            type="button"
+                            onClick={() => removeComunidadeTag(c)}
+                            className="hover:text-destructive text-muted-foreground ml-0.5"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </Badge>
+                      );
+                    })}
                     {(editing.comunidadesAtendidas ?? []).length === 0 && (
-                      <span className="text-xs text-muted-foreground italic">Nenhuma comunidade cadastrada</span>
+                      <span className="text-xs text-muted-foreground italic">Nenhuma comunidade vinculada a este projeto</span>
                     )}
                   </div>
                 </div>
@@ -395,9 +862,7 @@ function ProjetosPage() {
                 <CurrencyInput
                   step={1}
                   value={editing.publicoQuant}
-                  onChange={(v) =>
-                    setEditing({ ...editing, publicoQuant: v || 0 })
-                  }
+                  onChange={(v) => setEditing({ ...editing, publicoQuant: v || 0 })}
                 />
               </div>
               <div className="md:col-span-2">
@@ -450,9 +915,7 @@ function ProjetosPage() {
             <SelectContent>
               <SelectItem value="todos">Todos os financiadores</SelectItem>
               {dbFinanciadores.map((f) => (
-                <SelectItem key={f.id} value={f.nome}>
-                  {f.nome}
-                </SelectItem>
+                <SelectItem key={f.id} value={f.nome}>{f.nome}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -463,9 +926,7 @@ function ProjetosPage() {
             <SelectContent>
               <SelectItem value="todos">Todos os municípios</SelectItem>
               {dbMunicipios.map((m) => (
-                <SelectItem key={m.id} value={m.nome}>
-                  {m.nome}
-                </SelectItem>
+                <SelectItem key={m.id} value={m.nome}>{m.nome}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -476,9 +937,7 @@ function ProjetosPage() {
             <SelectContent>
               <SelectItem value="todos">Todos os status</SelectItem>
               {STATUS?.filter(s => s && String(s).trim() !== "").map((s) => (
-                <SelectItem key={s} value={String(s)}>
-                  {s}
-                </SelectItem>
+                <SelectItem key={s} value={String(s)}>{s}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -552,9 +1011,7 @@ function ProjetosPage() {
                     <TableCell>
                       <div className="flex flex-wrap gap-1 max-w-48">
                         {p.municipios.slice(0, 2).map((m) => (
-                          <Badge key={m} variant="secondary" className="text-[10px]">
-                            {m}
-                          </Badge>
+                          <Badge key={m} variant="secondary" className="text-[10px]">{m}</Badge>
                         ))}
                         {p.municipios.length > 2 && (
                           <Badge variant="secondary" className="text-[10px]">
@@ -566,9 +1023,7 @@ function ProjetosPage() {
                     <TableCell>
                       <div className="flex flex-wrap gap-1 max-w-48">
                         {(p.comunidadesAtendidas ?? []).slice(0, 2).map((c) => (
-                          <Badge key={c} variant="outline" className="text-[10px]">
-                            {c}
-                          </Badge>
+                          <Badge key={c} variant="outline" className="text-[10px]">{c}</Badge>
                         ))}
                         {(p.comunidadesAtendidas ?? []).length > 2 && (
                           <Badge variant="outline" className="text-[10px]">

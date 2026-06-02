@@ -32,14 +32,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Pencil,
   Plus,
   Trash2,
@@ -53,7 +45,15 @@ import {
 } from "lucide-react";
 import { formatDate } from "@/lib/mockData";
 import { useProjetos } from "@/lib/projetosStore";
-import { canEdit, denyToast, getOwnership, makeOwnership, removeOwnership, setOwnership, useOwnership } from "@/lib/ownershipStore";
+import {
+  canEdit,
+  denyToast,
+  getOwnership,
+  makeOwnership,
+  removeOwnership,
+  setOwnership,
+  useOwnership,
+} from "@/lib/ownershipStore";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { CollaboratorsSection } from "@/components/CollaboratorsSection";
 import { addNotification } from "@/lib/notificationsStore";
@@ -84,27 +84,148 @@ interface ProjetoTecnologiaRow {
   };
 }
 
+// ─── Configuração visual de cada Linha de Ação ──────────────────────────────
+interface LinhaConfig {
+  bg: string;
+  text: string;
+  border: string;
+  icon: string;
+  badgeBg: string;
+  badgeText: string;
+}
+
+const coresLinhasAcao: Record<string, LinhaConfig> = {
+  "Convivência com o Semiárido e Segurança Hídrica": {
+    bg: "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)",
+    text: "#ffffff",
+    border: "#0ea5e9",
+    icon: "💧",
+    badgeBg: "rgba(255,255,255,0.2)",
+    badgeText: "#ffffff",
+  },
+  "Saneamento Rural": {
+    bg: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
+    text: "#ffffff",
+    border: "#22c55e",
+    icon: "🚿",
+    badgeBg: "rgba(255,255,255,0.2)",
+    badgeText: "#ffffff",
+  },
+  "Energias Renováveis": {
+    bg: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+    text: "#ffffff",
+    border: "#f59e0b",
+    icon: "⚡",
+    badgeBg: "rgba(255,255,255,0.2)",
+    badgeText: "#ffffff",
+  },
+  "Agroecologia e Produção Sustentável": {
+    bg: "linear-gradient(135deg, #15803d 0%, #166534 100%)",
+    text: "#ffffff",
+    border: "#15803d",
+    icon: "🌱",
+    badgeBg: "rgba(255,255,255,0.2)",
+    badgeText: "#ffffff",
+  },
+  "Segurança Alimentar e Nutricional": {
+    bg: "linear-gradient(135deg, #f97316 0%, #c2410c 100%)",
+    text: "#ffffff",
+    border: "#f97316",
+    icon: "🌽",
+    badgeBg: "rgba(255,255,255,0.2)",
+    badgeText: "#ffffff",
+  },
+  "Inclusão Socioprodutiva e Economia Solidária": {
+    bg: "linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)",
+    text: "#ffffff",
+    border: "#a855f7",
+    icon: "🤝",
+    badgeBg: "rgba(255,255,255,0.2)",
+    badgeText: "#ffffff",
+  },
+  "Formação, ATER e Gestão Social": {
+    bg: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
+    text: "#ffffff",
+    border: "#6366f1",
+    icon: "📚",
+    badgeBg: "rgba(255,255,255,0.2)",
+    badgeText: "#ffffff",
+  },
+  "Meio Ambiente e Restauração Ecológica": {
+    bg: "linear-gradient(135deg, #059669 0%, #065f46 100%)",
+    text: "#ffffff",
+    border: "#059669",
+    icon: "🌿",
+    badgeBg: "rgba(255,255,255,0.2)",
+    badgeText: "#ffffff",
+  },
+  "Comunicação Popular e Mobilização Social": {
+    bg: "linear-gradient(135deg, #ec4899 0%, #be185d 100%)",
+    text: "#ffffff",
+    border: "#ec4899",
+    icon: "📣",
+    badgeBg: "rgba(255,255,255,0.2)",
+    badgeText: "#ffffff",
+  },
+  "Fortalecimento Organizativo": {
+    bg: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
+    text: "#ffffff",
+    border: "#8b5cf6",
+    icon: "🏛️",
+    badgeBg: "rgba(255,255,255,0.2)",
+    badgeText: "#ffffff",
+  },
+  "Direitos e Cidadania": {
+    bg: "linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)",
+    text: "#ffffff",
+    border: "#ef4444",
+    icon: "⚖️",
+    badgeBg: "rgba(255,255,255,0.2)",
+    badgeText: "#ffffff",
+  },
+};
+
+const defaultConfig: LinhaConfig = {
+  bg: "linear-gradient(135deg, #6b7280 0%, #4b5563 100%)",
+  text: "#ffffff",
+  border: "#6b7280",
+  icon: "📦",
+  badgeBg: "rgba(255,255,255,0.2)",
+  badgeText: "#ffffff",
+};
+
+function getLinhaConfig(linha: string): LinhaConfig {
+  return coresLinhasAcao[linha] ?? defaultConfig;
+}
+
+// ─── Página principal ────────────────────────────────────────────────────────
 function TecnologiasPage() {
   const projetos = useProjetos();
   const { email: currentEmail, name: currentName } = useCurrentUser();
-  
+
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ProjetoTecnologiaRow | null>(null);
   const [toDelete, setToDelete] = useState<ProjetoTecnologiaRow | null>(null);
-  
+  // linha de ação pré-selecionada ao clicar "+ Adicionar" em um grupo
+  const [preSelectedLinha, setPreSelectedLinha] = useState<string>("");
+
   const [tecnologias, setTecnologias] = useState<ProjetoTecnologiaRow[]>([]);
-  const [catalogo, setCatalogo] = useState<{ id: string; nome: string; linha_acao: string }[]>([]);
+  const [catalogo, setCatalogo] = useState<
+    { id: string; nome: string; linha_acao: string }[]
+  >([]);
   const [loading, setLoading] = useState(true);
 
   // Filtros
   const [searchQuery, setSearchQuery] = useState("");
   const [linhaFiltro, setLinhaFiltro] = useState("all");
 
+  // ── Fetch ────────────────────────────────────────────────────────────────
   const fetchTecnologias = async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("projeto_tecnologias")
-      .select(`
+      .select(
+        `
         id,
         projeto_id,
         tecnologia_id,
@@ -123,11 +244,18 @@ function TecnologiasPage() {
         projetos (
           nome
         )
-      `)
+      `
+      )
       .order("data", { ascending: false, nullsFirst: false });
 
     if (error) {
-      console.error("ERRO SUPABASE:", error.code, error.message, error.details, error.hint);
+      console.error(
+        "ERRO SUPABASE:",
+        error.code,
+        error.message,
+        error.details,
+        error.hint
+      );
       toast.error(`Erro ao carregar tecnologias: ${error.message}`);
     } else {
       setTecnologias((data as unknown as ProjetoTecnologiaRow[]) || []);
@@ -154,72 +282,124 @@ function TecnologiasPage() {
     fetchCatalogo();
   }, []);
 
-  const openCreate = () => {
+  // ── Handlers ─────────────────────────────────────────────────────────────
+  const openCreate = (linha?: string) => {
     setEditing(null);
+    setPreSelectedLinha(linha ?? "");
     setOpen(true);
   };
 
   const openEdit = (t: ProjetoTecnologiaRow) => {
-    if (!canEdit("tecnologia", t.id, currentEmail)) { denyToast(); return; }
+    if (!canEdit("tecnologia", t.id, currentEmail)) {
+      denyToast();
+      return;
+    }
     setEditing(t);
+    setPreSelectedLinha("");
     setOpen(true);
   };
 
   const requestDelete = (t: ProjetoTecnologiaRow) => {
-    if (!canEdit("tecnologia", t.id, currentEmail)) { denyToast(); return; }
+    if (!canEdit("tecnologia", t.id, currentEmail)) {
+      denyToast();
+      return;
+    }
     setToDelete(t);
   };
 
-  // Métricas do Dashboard
+  // ── Métricas ──────────────────────────────────────────────────────────────
   const metrics = useMemo(() => {
-    const totalQty = tecnologias.reduce((acc, t) => acc + (Number(t.quantidade) || 0), 0);
-    const totalFamilies = tecnologias.reduce((acc, t) => acc + (Number(t.familias) || 0), 0);
-    
-    const uniqueProj = new Set(tecnologias.map(t => t.projeto_id).filter(Boolean)).size;
-    
-    const allCities = tecnologias.flatMap(t => t.municipios ? t.municipios.split(",").map(s => s.trim()) : []);
+    const totalQty = tecnologias.reduce(
+      (acc, t) => acc + (Number(t.quantidade) || 0),
+      0
+    );
+    const totalFamilies = tecnologias.reduce(
+      (acc, t) => acc + (Number(t.familias) || 0),
+      0
+    );
+    const uniqueProj = new Set(
+      tecnologias.map((t) => t.projeto_id).filter(Boolean)
+    ).size;
+    const allCities = tecnologias.flatMap((t) =>
+      t.municipios ? t.municipios.split(",").map((s) => s.trim()) : []
+    );
     const uniqueCities = new Set(allCities.filter(Boolean)).size;
-
     return { totalQty, totalFamilies, uniqueProj, uniqueCities };
   }, [tecnologias]);
 
-  // Lista única de Linhas de Ação do Catálogo para o filtro
+  // ── Linhas de ação disponíveis para o filtro ──────────────────────────────
   const linhasDeAcao = useMemo(() => {
-    return [...new Set(catalogo.map(t => t.linha_acao))];
+    return [...new Set(catalogo.map((t) => t.linha_acao))];
   }, [catalogo]);
 
-  // Filtragem dos itens na listagem
+  // ── Filtragem + Agrupamento ───────────────────────────────────────────────
   const filteredTecnologias = useMemo(() => {
-    return tecnologias.filter(t => {
+    return tecnologias.filter((t) => {
       const nomeTech = t.tecnologias?.nome?.toLowerCase() || "";
       const projName = t.projetos?.nome?.toLowerCase() || "";
       const muni = t.municipios?.toLowerCase() || "";
       const obs = t.observacoes?.toLowerCase() || "";
       const search = searchQuery.toLowerCase();
 
-      const matchesSearch = 
-        nomeTech.includes(search) || 
-        projName.includes(search) || 
-        muni.includes(search) || 
+      const matchesSearch =
+        nomeTech.includes(search) ||
+        projName.includes(search) ||
+        muni.includes(search) ||
         obs.includes(search);
 
-      const matchesLinha = linhaFiltro === "all" || t.tecnologias?.linha_acao === linhaFiltro;
+      const matchesLinha =
+        linhaFiltro === "all" || t.tecnologias?.linha_acao === linhaFiltro;
 
       return matchesSearch && matchesLinha;
     });
   }, [tecnologias, searchQuery, linhaFiltro]);
 
+  const grupos = useMemo(() => {
+    return filteredTecnologias.reduce((acc, tec) => {
+      const linha = tec.tecnologias?.linha_acao ?? "Sem categoria";
+      if (!acc[linha]) acc[linha] = [];
+      acc[linha].push(tec);
+      return acc;
+    }, {} as Record<string, ProjetoTecnologiaRow[]>);
+  }, [filteredTecnologias]);
+
+  // Ordem preferencial das linhas
+  const ordemLinhas = [
+    "Convivência com o Semiárido e Segurança Hídrica",
+    "Saneamento Rural",
+    "Energias Renováveis",
+    "Agroecologia e Produção Sustentável",
+    "Segurança Alimentar e Nutricional",
+    "Inclusão Socioprodutiva e Economia Solidária",
+    "Formação, ATER e Gestão Social",
+    "Meio Ambiente e Restauração Ecológica",
+    "Comunicação Popular e Mobilização Social",
+    "Fortalecimento Organizativo",
+    "Direitos e Cidadania",
+  ];
+
+  const gruposOrdenados = Object.entries(grupos).sort(([a], [b]) => {
+    const ia = ordemLinhas.indexOf(a);
+    const ib = ordemLinhas.indexOf(b);
+    if (ia === -1 && ib === -1) return a.localeCompare(b);
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <AppLayout
       title="Tecnologias Sociais"
-      subtitle="Catálogo oficial e registro de tecnologias sociais implementadas pela CHAPADA no Semiárido"
+      subtitle="Registro e monitoramento das tecnologias implementadas pela CHAPADA"
       actions={
-        <Button onClick={openCreate} className="gap-2">
+        <Button onClick={() => openCreate()} className="gap-2">
           <Plus className="h-4 w-4" /> Nova Tecnologia
         </Button>
       }
     >
       <div className="space-y-6">
+        {/* Banner institucional */}
         <Card className="bg-primary/5 border-primary/10">
           <CardContent className="p-4 flex flex-col md:flex-row items-start md:items-center gap-4">
             <div className="bg-primary/10 p-3 rounded-xl text-primary shrink-0">
@@ -230,21 +410,30 @@ function TecnologiasPage() {
                 Convivência e Transformação no Semiárido
               </h3>
               <p className="text-sm text-muted-foreground max-w-4xl">
-                A ONG Chapada acumula mais de 31 anos de atuação nas comunidades do Semiárido pernambucano e piauiense, 
-                tendo implantado quase <strong>11 mil tecnologias sociais hídricas</strong> e beneficiado aproximadamente 
-                <strong> 22 mil famílias agricultoras</strong>. Os registros abaixo são integrados aos projetos financiados pelos nossos parceiros e apoiadores.
+                A ONG Chapada acumula mais de 31 anos de atuação nas comunidades
+                do Semiárido pernambucano e piauiense, tendo implantado quase{" "}
+                <strong>11 mil tecnologias sociais hídricas</strong> e
+                beneficiado aproximadamente{" "}
+                <strong> 22 mil famílias agricultoras</strong>. Os registros
+                abaixo são integrados aos projetos financiados pelos nossos
+                parceiros e apoiadores.
               </p>
             </div>
           </CardContent>
         </Card>
 
+        {/* Cards de métricas */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <CardContent className="p-5 flex items-center justify-between">
               <div className="space-y-1">
-                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Implementações</span>
+                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                  Implementações
+                </span>
                 <h4 className="text-2xl font-bold">{tecnologias.length}</h4>
-                <p className="text-[11px] text-muted-foreground">Tecnologias registradas</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Tecnologias registradas
+                </p>
               </div>
               <Wrench className="w-5 h-5 text-muted-foreground" />
             </CardContent>
@@ -253,9 +442,15 @@ function TecnologiasPage() {
           <Card>
             <CardContent className="p-5 flex items-center justify-between">
               <div className="space-y-1">
-                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Quantidade Total</span>
-                <h4 className="text-2xl font-bold">{metrics.totalQty.toLocaleString("pt-BR")}</h4>
-                <p className="text-[11px] text-muted-foreground">Unidades implantadas</p>
+                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                  Quantidade Total
+                </span>
+                <h4 className="text-2xl font-bold">
+                  {metrics.totalQty.toLocaleString("pt-BR")}
+                </h4>
+                <p className="text-[11px] text-muted-foreground">
+                  Unidades implantadas
+                </p>
               </div>
               <Droplets className="w-5 h-5 text-muted-foreground" />
             </CardContent>
@@ -264,9 +459,15 @@ function TecnologiasPage() {
           <Card>
             <CardContent className="p-5 flex items-center justify-between">
               <div className="space-y-1">
-                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Famílias Atendidas</span>
-                <h4 className="text-2xl font-bold">{metrics.totalFamilies.toLocaleString("pt-BR")}</h4>
-                <p className="text-[11px] text-muted-foreground">Famílias beneficiadas</p>
+                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                  Famílias Atendidas
+                </span>
+                <h4 className="text-2xl font-bold">
+                  {metrics.totalFamilies.toLocaleString("pt-BR")}
+                </h4>
+                <p className="text-[11px] text-muted-foreground">
+                  Famílias beneficiadas
+                </p>
               </div>
               <Users className="w-5 h-5 text-muted-foreground" />
             </CardContent>
@@ -275,125 +476,271 @@ function TecnologiasPage() {
           <Card>
             <CardContent className="p-5 flex items-center justify-between">
               <div className="space-y-1">
-                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Alcance Geográfico</span>
-                <h4 className="text-2xl font-bold">{metrics.uniqueCities} {metrics.uniqueCities === 1 ? "Município" : "Municípios"}</h4>
-                <p className="text-[11px] text-muted-foreground">Em {metrics.uniqueProj} {metrics.uniqueProj === 1 ? "projeto" : "projetos"}</p>
+                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                  Alcance Geográfico
+                </span>
+                <h4 className="text-2xl font-bold">
+                  {metrics.uniqueCities}{" "}
+                  {metrics.uniqueCities === 1 ? "Município" : "Municípios"}
+                </h4>
+                <p className="text-[11px] text-muted-foreground">
+                  Em {metrics.uniqueProj}{" "}
+                  {metrics.uniqueProj === 1 ? "projeto" : "projetos"}
+                </p>
               </div>
               <MapPin className="w-5 h-5 text-muted-foreground" />
             </CardContent>
           </Card>
         </div>
 
+        {/* Barra de busca */}
         <Card>
-          <CardContent className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 border-b border-border">
+          <CardContent className="p-4">
             <div className="relative">
               <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Buscar tecnologia, projeto..."
+                placeholder="Buscar tecnologia, projeto, município..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
               />
             </div>
-            <Select value={linhaFiltro} onValueChange={setLinhaFiltro}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filtrar por Linha de Ação" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as Linhas de Ação</SelectItem>
-                {linhasDeAcao.map((linha) => (
-                  <SelectItem key={linha} value={linha}>
-                    {linha}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </CardContent>
-          <CardContent className="p-0 overflow-x-auto">
-            {loading ? (
-              <div className="flex justify-center items-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : filteredTecnologias.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground">
-                <Info className="h-10 w-10 mx-auto mb-3 text-muted" />
-                <p>Nenhum registro de tecnologia encontrado.</p>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Tecnologia</TableHead>
-                    <TableHead>Linha de Ação</TableHead>
-                    <TableHead>Projeto</TableHead>
-                    <TableHead>Qtd.</TableHead>
-                    <TableHead>Unidade</TableHead>
-                    <TableHead>Famílias</TableHead>
-                    <TableHead>Municípios</TableHead>
-                    <TableHead>Comunidades</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Observações</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredTecnologias.map((t) => (
-                    <TableRow key={t.id}>
-                      <TableCell className="font-medium">
-                        {t.tecnologias?.nome || "Sem Nome"}
-                      </TableCell>
-                      <TableCell>
-                        <span className="px-2 py-0.5 rounded-full text-[11px] border bg-primary/10 text-primary border-primary/30 font-medium">
-                          {t.tecnologias?.linha_acao || "—"}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium">{t.projetos?.nome || "—"}</div>
-                        {(() => { 
-                          const o = getOwnership("tecnologia", t.id); 
-                          return o ? (
-                            <div className="text-[10px] text-muted-foreground mt-0.5">
-                              Criado por {o.ownerName}
-                            </div>
-                          ) : null; 
-                        })()}
-                      </TableCell>
-                      <TableCell className="font-semibold">
-                        {t.quantidade.toLocaleString("pt-BR")}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {t.unidade}
-                      </TableCell>
-                      <TableCell>
-                        {t.familias ? t.familias.toLocaleString("pt-BR") : "—"}
-                      </TableCell>
-                      <TableCell className="text-xs truncate max-w-[150px]" title={t.municipios}>
-                        {t.municipios || "—"}
-                      </TableCell>
-                      <TableCell className="text-xs truncate max-w-[150px]" title={t.comunidades}>
-                        {t.comunidades || "—"}
-                      </TableCell>
-                      <TableCell className="text-xs whitespace-nowrap">
-                        {formatDate(t.data)}
-                      </TableCell>
-                      <TableCell className="text-xs truncate max-w-[180px]" title={t.observacoes}>
-                        {t.observacoes || "—"}
-                      </TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
-                        <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => requestDelete(t)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
           </CardContent>
         </Card>
+
+        {/* Filtro de Categorias — botões/abas com scroll horizontal */}
+        <div
+          className="flex gap-2 overflow-x-auto pb-1 scroll-smooth"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        >
+          {/* Botão "Todas" */}
+          <button
+            type="button"
+            onClick={() => setLinhaFiltro("all")}
+            className={`flex items-center gap-1.5 whitespace-nowrap px-4 py-2 rounded-full text-xs font-semibold border transition-all shrink-0 ${
+              linhaFiltro === "all"
+                ? "bg-foreground text-background border-foreground shadow-sm"
+                : "bg-card text-muted-foreground border-border hover:border-foreground/40 hover:text-foreground"
+            }`}
+          >
+            ✦ Todas
+          </button>
+
+          {/* Botões das categorias que existem nos dados */}
+          {linhasDeAcao.map((linha) => {
+            const cfg = getLinhaConfig(linha);
+            const isActive = linhaFiltro === linha;
+            return (
+              <button
+                key={linha}
+                type="button"
+                onClick={() => setLinhaFiltro(isActive ? "all" : linha)}
+                className={`flex items-center gap-1.5 whitespace-nowrap px-4 py-2 rounded-full text-xs font-semibold border transition-all shrink-0 ${
+                  isActive
+                    ? "shadow-md"
+                    : "bg-card text-muted-foreground border-border hover:opacity-80"
+                }`}
+                style={
+                  isActive
+                    ? {
+                        background: cfg.bg,
+                        color: cfg.text,
+                        borderColor: cfg.border,
+                      }
+                    : undefined
+                }
+              >
+                <span>{cfg.icon}</span>
+                {linha}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Conteúdo principal */}
+        {loading ? (
+          <div className="flex justify-center items-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : gruposOrdenados.length === 0 ? (
+          <div className="p-16 text-center text-muted-foreground">
+            <Info className="h-12 w-12 mx-auto mb-4 text-muted" />
+            <p className="text-base font-medium">
+              Nenhum registro de tecnologia encontrado.
+            </p>
+            <p className="text-sm mt-1">
+              Tente ajustar os filtros ou cadastre uma nova tecnologia.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {gruposOrdenados.map(([linha, itens]) => {
+              const cfg = getLinhaConfig(linha);
+              const totalUnidades = itens.reduce(
+                (sum, t) => sum + (Number(t.quantidade) || 0),
+                0
+              );
+
+              return (
+                <div
+                  key={linha}
+                  className="rounded-xl overflow-hidden shadow-md border"
+                  style={{ borderColor: cfg.border + "40" }}
+                >
+                  {/* Header colorido do grupo */}
+                  <div
+                    style={{
+                      background: cfg.bg,
+                      color: cfg.text,
+                    }}
+                    className="px-5 py-4 flex items-center justify-between gap-4"
+                  >
+                    <div className="flex items-start gap-3 min-w-0">
+                      <span className="text-2xl leading-none shrink-0 mt-0.5">
+                        {cfg.icon}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="font-bold text-base leading-snug">
+                          {linha}
+                        </p>
+                        <p
+                          className="text-sm mt-0.5"
+                          style={{ opacity: 0.85 }}
+                        >
+                          {itens.length}{" "}
+                          {itens.length === 1
+                            ? "tecnologia cadastrada"
+                            : "tecnologias cadastradas"}{" "}
+                          · Total:{" "}
+                          <strong>
+                            {totalUnidades.toLocaleString("pt-BR")} unidades
+                          </strong>
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => openCreate(linha)}
+                      style={{
+                        background: cfg.badgeBg,
+                        color: cfg.text,
+                        border: "1px solid rgba(255,255,255,0.35)",
+                        backdropFilter: "blur(4px)",
+                        whiteSpace: "nowrap",
+                        flexShrink: 0,
+                      }}
+                      className="gap-1.5 font-medium hover:opacity-90 transition-opacity"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Adicionar
+                    </Button>
+                  </div>
+
+                  {/* Tabela interna do grupo */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr
+                          className="border-b text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                          style={{
+                            background: cfg.border + "10",
+                          }}
+                        >
+                          <th className="px-4 py-2.5 text-left">Nome</th>
+                          <th className="px-4 py-2.5 text-left">Quantidade</th>
+                          <th className="px-4 py-2.5 text-left">Famílias</th>
+                          <th className="px-4 py-2.5 text-left">Municípios</th>
+                          <th className="px-4 py-2.5 text-left">Projeto</th>
+                          <th className="px-4 py-2.5 text-left">Data</th>
+                          <th className="px-4 py-2.5 text-right">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {itens.map((tec, idx) => {
+                          const ownership = getOwnership(
+                            "tecnologia",
+                            tec.id
+                          );
+                          return (
+                            <tr
+                              key={tec.id}
+                              className="border-b last:border-0 transition-colors hover:bg-muted/40"
+                              style={
+                                idx % 2 === 0
+                                  ? { background: "transparent" }
+                                  : { background: cfg.border + "06" }
+                              }
+                            >
+                              <td className="px-4 py-3 font-medium text-foreground">
+                                {tec.tecnologias?.nome || "Sem Nome"}
+                              </td>
+                              <td className="px-4 py-3 text-foreground">
+                                <span className="font-semibold">
+                                  {Number(tec.quantidade).toLocaleString(
+                                    "pt-BR"
+                                  )}
+                                </span>{" "}
+                                <span className="text-muted-foreground text-xs">
+                                  {tec.unidade}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-foreground">
+                                {tec.familias
+                                  ? Number(tec.familias).toLocaleString("pt-BR")
+                                  : <span className="text-muted-foreground">—</span>}
+                              </td>
+                              <td
+                                className="px-4 py-3 text-foreground max-w-[160px] truncate"
+                                title={tec.municipios}
+                              >
+                                {tec.municipios || (
+                                  <span className="text-muted-foreground">
+                                    —
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="font-medium text-foreground leading-snug">
+                                  {tec.projetos?.nome || "—"}
+                                </div>
+                                {ownership && (
+                                  <div className="text-[10px] text-muted-foreground mt-0.5">
+                                    Criado por {ownership.ownerName}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-muted-foreground whitespace-nowrap text-xs">
+                                {tec.data ? formatDate(tec.data) : "—"}
+                              </td>
+                              <td className="px-4 py-3 text-right whitespace-nowrap">
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8"
+                                  onClick={() => openEdit(tec)}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8 text-destructive hover:text-destructive"
+                                  onClick={() => requestDelete(tec)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <TecnologiaModal
@@ -405,14 +752,21 @@ function TecnologiasPage() {
         currentEmail={currentEmail}
         currentName={currentName}
         onSuccess={fetchTecnologias}
+        preSelectedLinha={preSelectedLinha}
       />
 
-      <AlertDialog open={!!toDelete} onOpenChange={(v) => !v && setToDelete(null)}>
+      <AlertDialog
+        open={!!toDelete}
+        onOpenChange={(v) => !v && setToDelete(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remover tecnologia?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação não pode ser desfeita. {toDelete ? `A tecnologia "${toDelete.tecnologias?.nome}" associada ao projeto "${toDelete.projetos?.nome}" será removida permanentemente.` : ""}
+              Esta ação não pode ser desfeita.{" "}
+              {toDelete
+                ? `A tecnologia "${toDelete.tecnologias?.nome}" associada ao projeto "${toDelete.projetos?.nome}" será removida permanentemente.`
+                : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -421,17 +775,29 @@ function TecnologiasPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={async () => {
                 if (toDelete) {
-                  if (!canEdit("tecnologia", toDelete.id, currentEmail)) { denyToast(); setToDelete(null); return; }
+                  if (!canEdit("tecnologia", toDelete.id, currentEmail)) {
+                    denyToast();
+                    setToDelete(null);
+                    return;
+                  }
                   try {
-                    const { error } = await supabase.from("projeto_tecnologias").delete().eq("id", toDelete.id);
+                    const { error } = await supabase
+                      .from("projeto_tecnologias")
+                      .delete()
+                      .eq("id", toDelete.id);
                     if (error) throw error;
-                    
+
                     removeOwnership("tecnologia", toDelete.id);
                     toast.success("Tecnologia excluída com sucesso.");
                     await fetchTecnologias();
                   } catch (err: any) {
-                    console.error("ERRO COMPLETO:", JSON.stringify(err, null, 2));
-                    toast.error(`Erro ao excluir tecnologia: ${err.message || JSON.stringify(err)}`);
+                    console.error(
+                      "ERRO COMPLETO:",
+                      JSON.stringify(err, null, 2)
+                    );
+                    toast.error(
+                      `Erro ao excluir tecnologia: ${err.message || JSON.stringify(err)}`
+                    );
                   }
                 }
                 setToDelete(null);
@@ -446,6 +812,7 @@ function TecnologiasPage() {
   );
 }
 
+// ─── Modal de criação/edição ─────────────────────────────────────────────────
 function TecnologiaModal({
   open,
   onOpenChange,
@@ -455,6 +822,7 @@ function TecnologiaModal({
   currentEmail,
   currentName,
   onSuccess,
+  preSelectedLinha,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -464,6 +832,7 @@ function TecnologiaModal({
   currentEmail: string;
   currentName: string;
   onSuccess: () => Promise<void>;
+  preSelectedLinha: string;
 }) {
   const [tecnologiaId, setTecnologiaId] = useState("");
   const [quantidade, setQuantidade] = useState("");
@@ -478,18 +847,8 @@ function TecnologiaModal({
 
   // Agrupar catálogo por linha de ação para exibir no select
   const linhasDeAcao = useMemo(() => {
-    return [...new Set(catalogo.map(t => t.linha_acao))];
+    return [...new Set(catalogo.map((t) => t.linha_acao))];
   }, [catalogo]);
-
-  // Identificar se a tecnologia selecionada necessita de exibição de famílias (como Agroecologia ou Fortalecimento)
-  const isFamiliasVisible = useMemo(() => {
-    if (!tecnologiaId) return true; // Mostrar por padrão ou deixar visível
-    const selected = catalogo.find(t => t.id === tecnologiaId);
-    if (!selected) return true;
-    
-    // De acordo com o perfil real da ONG, tecnologias agroecológicas, saneamento, etc., beneficiam famílias
-    return true; // Mantemos visível como opcional para todas as tecnologias do Semiárido
-  }, [tecnologiaId, catalogo]);
 
   useEffect(() => {
     if (!open) return;
@@ -501,10 +860,22 @@ function TecnologiaModal({
       setMunicipios(editing.municipios || "");
       setComunidades(editing.comunidades ?? "");
       setProjetoId(editing.projeto_id ?? "");
-      setData(editing.data ? editing.data.slice(0, 10) : new Date().toISOString().slice(0, 10));
+      setData(
+        editing.data
+          ? editing.data.slice(0, 10)
+          : new Date().toISOString().slice(0, 10)
+      );
       setObservacoes(editing.observacoes ?? "");
     } else {
-      setTecnologiaId("");
+      // Se há uma linha pré-selecionada, pré-selecionar a primeira tecnologia dessa linha
+      if (preSelectedLinha) {
+        const firstOfLinha = catalogo.find(
+          (t) => t.linha_acao === preSelectedLinha
+        );
+        setTecnologiaId(firstOfLinha?.id ?? "");
+      } else {
+        setTecnologiaId("");
+      }
       setUnidade("unidades");
       setQuantidade("");
       setFamilias("");
@@ -514,7 +885,7 @@ function TecnologiaModal({
       setData(new Date().toISOString().slice(0, 10));
       setObservacoes("");
     }
-  }, [open, editing]);
+  }, [open, editing, preSelectedLinha, catalogo]);
 
   const submit = async () => {
     if (!tecnologiaId) {
@@ -533,13 +904,16 @@ function TecnologiaModal({
       toast.error("Por favor, informe os municípios atendidos.");
       return;
     }
-    
+
     try {
-      const selectedTech = catalogo.find(t => t.id === tecnologiaId);
+      const selectedTech = catalogo.find((t) => t.id === tecnologiaId);
       const techNome = selectedTech?.nome || "Tecnologia Social";
 
       if (editing) {
-        if (!canEdit("tecnologia", editing.id, currentEmail)) { denyToast(); return; }
+        if (!canEdit("tecnologia", editing.id, currentEmail)) {
+          denyToast();
+          return;
+        }
         const { error } = await supabase
           .from("projeto_tecnologias")
           .update({
@@ -558,31 +932,35 @@ function TecnologiaModal({
         toast.success("Tecnologia atualizada com sucesso.");
       } else {
         const id = crypto.randomUUID();
-        const { error } = await supabase
-          .from("projeto_tecnologias")
-          .insert({
-            id,
-            projeto_id: projetoId,
-            tecnologia_id: tecnologiaId,
-            quantidade: Number(quantidade),
-            unidade,
-            familias: familias ? Number(familias) : null,
-            municipios,
-            comunidades: comunidades || null,
-            data,
-            observacoes: observacoes || null,
-          });
+        const { error } = await supabase.from("projeto_tecnologias").insert({
+          id,
+          projeto_id: projetoId,
+          tecnologia_id: tecnologiaId,
+          quantidade: Number(quantidade),
+          unidade,
+          familias: familias ? Number(familias) : null,
+          municipios,
+          comunidades: comunidades || null,
+          data,
+          observacoes: observacoes || null,
+        });
         if (error) throw error;
         setOwnership("tecnologia", id, makeOwnership(currentEmail, currentName));
-        addNotification({ type: "tecnologia", title: "Nova tecnologia cadastrada", body: techNome });
+        addNotification({
+          type: "tecnologia",
+          title: "Nova tecnologia cadastrada",
+          body: techNome,
+        });
         toast.success("Tecnologia cadastrada com sucesso.");
       }
-      
+
       await onSuccess();
       onOpenChange(false);
     } catch (err: any) {
       console.error("ERRO COMPLETO AO SALVAR:", JSON.stringify(err, null, 2));
-      toast.error(`Erro ao salvar tecnologia: ${err.message || JSON.stringify(err)}`);
+      toast.error(
+        `Erro ao salvar tecnologia: ${err.message || JSON.stringify(err)}`
+      );
     }
   };
 
@@ -591,14 +969,18 @@ function TecnologiaModal({
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {editing ? "Editar Registro de Tecnologia" : "Novo Registro de Tecnologia"}
+            {editing
+              ? "Editar Registro de Tecnologia"
+              : "Novo Registro de Tecnologia"}
           </DialogTitle>
         </DialogHeader>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2">
-          
           <div className="md:col-span-2">
-            <Label>Tecnologia Social (Catálogo Chapada) <span className="text-destructive">*</span></Label>
+            <Label>
+              Tecnologia Social (Catálogo Chapada){" "}
+              <span className="text-destructive">*</span>
+            </Label>
             <select
               value={tecnologiaId}
               onChange={(e) => setTecnologiaId(e.target.value)}
@@ -621,16 +1003,23 @@ function TecnologiaModal({
           </div>
 
           <div>
-            <Label>Quantidade Implementada <span className="text-destructive">*</span></Label>
+            <Label>
+              Quantidade Implementada{" "}
+              <span className="text-destructive">*</span>
+            </Label>
             <CurrencyInput
               step={1}
               value={quantidade !== "" ? Number(quantidade) : undefined}
-              onChange={(v) => setQuantidade(v !== undefined ? String(v) : "")}
+              onChange={(v) =>
+                setQuantidade(v !== undefined ? String(v) : "")
+              }
             />
           </div>
 
           <div>
-            <Label>Unidade de Medida <span className="text-destructive">*</span></Label>
+            <Label>
+              Unidade de Medida <span className="text-destructive">*</span>
+            </Label>
             <Select value={unidade} onValueChange={setUnidade}>
               <SelectTrigger>
                 <SelectValue />
@@ -645,20 +1034,23 @@ function TecnologiaModal({
             </Select>
           </div>
 
-          {isFamiliasVisible && (
-            <div className="md:col-span-2">
-              <Label>Famílias Beneficiadas (Opcional)</Label>
-              <CurrencyInput
-                step={1}
-                value={familias !== "" ? Number(familias) : undefined}
-                onChange={(v) => setFamilias(v !== undefined ? String(v) : "")}
-                placeholder="Informe o número total de famílias atendidas"
-              />
-            </div>
-          )}
+          <div className="md:col-span-2">
+            <Label>Famílias Beneficiadas (Opcional)</Label>
+            <CurrencyInput
+              step={1}
+              value={familias !== "" ? Number(familias) : undefined}
+              onChange={(v) =>
+                setFamilias(v !== undefined ? String(v) : "")
+              }
+              placeholder="Informe o número total de famílias atendidas"
+            />
+          </div>
 
           <div className="md:col-span-2">
-            <Label>Municípios Atendidos <span className="text-destructive">*</span></Label>
+            <Label>
+              Municípios Atendidos{" "}
+              <span className="text-destructive">*</span>
+            </Label>
             <Input
               value={municipios}
               onChange={(e) => setMunicipios(e.target.value)}
@@ -676,7 +1068,9 @@ function TecnologiaModal({
           </div>
 
           <div>
-            <Label>Projeto Vinculado <span className="text-destructive">*</span></Label>
+            <Label>
+              Projeto Vinculado <span className="text-destructive">*</span>
+            </Label>
             <Select value={projetoId || undefined} onValueChange={setProjetoId}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione o projeto" />
@@ -691,14 +1085,19 @@ function TecnologiaModal({
                       </SelectItem>
                     ))
                 ) : (
-                  <SelectItem value="none" disabled>Nenhum projeto cadastrado</SelectItem>
+                  <SelectItem value="none" disabled>
+                    Nenhum projeto cadastrado
+                  </SelectItem>
                 )}
               </SelectContent>
             </Select>
           </div>
 
           <div>
-            <Label>Data de Implementação <span className="text-destructive">*</span></Label>
+            <Label>
+              Data de Implementação{" "}
+              <span className="text-destructive">*</span>
+            </Label>
             <Input
               type="date"
               value={data}
@@ -718,7 +1117,12 @@ function TecnologiaModal({
 
           {editing && editingOwnership && (
             <div className="md:col-span-2">
-              <CollaboratorsSection type="tecnologia" id={editing.id} ownership={editingOwnership} currentEmail={currentEmail} />
+              <CollaboratorsSection
+                type="tecnologia"
+                id={editing.id}
+                ownership={editingOwnership}
+                currentEmail={currentEmail}
+              />
             </div>
           )}
         </div>
@@ -727,9 +1131,7 @@ function TecnologiaModal({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={submit}>
-            {editing ? "Salvar" : "Salvar"}
-          </Button>
+          <Button onClick={submit}>Salvar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -45,7 +45,8 @@ export function AppSidebar() {
   const isAdmin = profile?.role === "admin";
 
   const visibleNav = nav.filter(item => {
-    if (item.to === "/auditoria") return isAdmin;
+    // Auditoria é ocultada do menu — os logs continuam sendo gravados no banco normalmente
+    if (item.to === "/auditoria") return false;
     if (item.to === "/usuarios") return isAdmin;
     return true;
   });
