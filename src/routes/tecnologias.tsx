@@ -10,9 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -399,29 +397,6 @@ function TecnologiasPage() {
       }
     >
       <div className="space-y-6">
-        {/* Banner institucional */}
-        <Card className="bg-primary/5 border-primary/10">
-          <CardContent className="p-4 flex flex-col md:flex-row items-start md:items-center gap-4">
-            <div className="bg-primary/10 p-3 rounded-xl text-primary shrink-0">
-              <Droplets className="w-6 h-6" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="font-semibold text-foreground flex items-center gap-2">
-                Convivência e Transformação no Semiárido
-              </h3>
-              <p className="text-sm text-muted-foreground max-w-4xl">
-                A ONG Chapada acumula mais de 31 anos de atuação nas comunidades
-                do Semiárido pernambucano e piauiense, tendo implantado quase{" "}
-                <strong>11 mil tecnologias sociais hídricas</strong> e
-                beneficiado aproximadamente{" "}
-                <strong> 22 mil famílias agricultoras</strong>. Os registros
-                abaixo são integrados aos projetos financiados pelos nossos
-                parceiros e apoiadores.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Cards de métricas */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
@@ -834,6 +809,7 @@ function TecnologiaModal({
   onSuccess: () => Promise<void>;
   preSelectedLinha: string;
 }) {
+  const [linhaAcao, setLinhaAcao] = useState("");
   const [tecnologiaId, setTecnologiaId] = useState("");
   const [quantidade, setQuantidade] = useState("");
   const [unidade, setUnidade] = useState("unidades");
@@ -845,14 +821,36 @@ function TecnologiaModal({
   const [observacoes, setObservacoes] = useState("");
   const editingOwnership = useOwnership("tecnologia", editing?.id ?? "");
 
-  // Agrupar catálogo por linha de ação para exibir no select
+  // Linhas de ação disponíveis no catálogo
   const linhasDeAcao = useMemo(() => {
-    return [...new Set(catalogo.map((t) => t.linha_acao))];
+    const order = [
+      "Convivência com o Semiárido e Segurança Hídrica",
+      "Saneamento Rural",
+      "Energias Renováveis",
+      "Agroecologia e Produção Sustentável",
+      "Segurança Alimentar e Nutricional",
+      "Inclusão Socioprodutiva e Economia Solidária",
+      "Formação, ATER e Gestão Social",
+      "Meio Ambiente e Restauração Ecológica",
+      "Comunicação Popular e Mobilização Social",
+    ];
+    return [...new Set(catalogo.map((t) => t.linha_acao))].sort(
+      (a, b) => (order.indexOf(a) ?? 99) - (order.indexOf(b) ?? 99)
+    );
   }, [catalogo]);
+
+  // Tecnologias filtradas pela linha selecionada
+  const tecnologiasFiltradas = useMemo(() => {
+    if (!linhaAcao) return [];
+    return catalogo.filter((t) => t.linha_acao === linhaAcao);
+  }, [catalogo, linhaAcao]);
 
   useEffect(() => {
     if (!open) return;
     if (editing) {
+      const techLinha =
+        catalogo.find((t) => t.id === editing.tecnologia_id)?.linha_acao ?? "";
+      setLinhaAcao(techLinha);
       setTecnologiaId(editing.tecnologia_id || "");
       setQuantidade(String(editing.quantidade));
       setUnidade(editing.unidade || "unidades");
@@ -867,7 +865,7 @@ function TecnologiaModal({
       );
       setObservacoes(editing.observacoes ?? "");
     } else {
-      // Se há uma linha pré-selecionada, pré-selecionar a primeira tecnologia dessa linha
+      setLinhaAcao(preSelectedLinha ?? "");
       if (preSelectedLinha) {
         const firstOfLinha = catalogo.find(
           (t) => t.linha_acao === preSelectedLinha
@@ -886,6 +884,11 @@ function TecnologiaModal({
       setObservacoes("");
     }
   }, [open, editing, preSelectedLinha, catalogo]);
+
+  const handleLinhaChange = (value: string) => {
+    setLinhaAcao(value);
+    setTecnologiaId("");
+  };
 
   const submit = async () => {
     if (!tecnologiaId) {
@@ -945,7 +948,11 @@ function TecnologiaModal({
           observacoes: observacoes || null,
         });
         if (error) throw error;
-        setOwnership("tecnologia", id, makeOwnership(currentEmail, currentName));
+        setOwnership(
+          "tecnologia",
+          id,
+          makeOwnership(currentEmail, currentName)
+        );
         addNotification({
           type: "tecnologia",
           title: "Nova tecnologia cadastrada",
@@ -964,92 +971,128 @@ function TecnologiaModal({
     }
   };
 
+  const linhaConfig = linhaAcao ? getLinhaConfig(linhaAcao) : null;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
+      <DialogContent className="max-w-lg max-h-[92vh] overflow-y-auto p-0">
+        {/* Header colorido */}
+        <div
+          className="px-6 pt-6 pb-5 rounded-t-lg"
+          style={
+            linhaConfig
+              ? { background: linhaConfig.bg }
+              : {
+                  background:
+                    "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+                }
+          }
+        >
+          <DialogTitle className="text-white text-lg font-bold leading-snug">
             {editing
               ? "Editar Registro de Tecnologia"
-              : "Novo Registro de Tecnologia"}
+              : "Nova Tecnologia"}
           </DialogTitle>
-        </DialogHeader>
+          <p className="text-white/70 text-sm mt-0.5">
+            {linhaAcao
+              ? `${linhaConfig?.icon ?? ""} ${linhaAcao}`
+              : "Selecione a categoria para começar"}
+          </p>
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2">
-          <div className="md:col-span-2">
-            <Label>
-              Tecnologia Social (Catálogo Chapada){" "}
-              <span className="text-destructive">*</span>
+        <div className="px-6 py-5 space-y-4">
+          {/* Campo 1 — Categoria */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">
+              Categoria <span className="text-destructive">*</span>
             </Label>
-            <select
-              value={tecnologiaId}
-              onChange={(e) => setTecnologiaId(e.target.value)}
-              required
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <option value="">Selecione a tecnologia...</option>
-              {linhasDeAcao.map((linha) => (
-                <optgroup key={linha} label={linha}>
-                  {catalogo
-                    .filter((t) => t.linha_acao === linha)
-                    .map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.nome}
-                      </option>
-                    ))}
-                </optgroup>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <Label>
-              Quantidade Implementada{" "}
-              <span className="text-destructive">*</span>
-            </Label>
-            <CurrencyInput
-              step={1}
-              value={quantidade !== "" ? Number(quantidade) : undefined}
-              onChange={(v) =>
-                setQuantidade(v !== undefined ? String(v) : "")
-              }
-            />
-          </div>
-
-          <div>
-            <Label>
-              Unidade de Medida <span className="text-destructive">*</span>
-            </Label>
-            <Select value={unidade} onValueChange={setUnidade}>
-              <SelectTrigger>
-                <SelectValue />
+            <Select value={linhaAcao} onValueChange={handleLinhaChange}>
+              <SelectTrigger className="h-10">
+                <SelectValue placeholder="Selecione a linha de ação..." />
               </SelectTrigger>
               <SelectContent>
-                {["unidades", "hectares", "famílias"].map((u) => (
-                  <SelectItem key={u} value={u}>
-                    {u}
+                {linhasDeAcao.map((linha) => {
+                  const cfg = getLinhaConfig(linha);
+                  return (
+                    <SelectItem key={linha} value={linha}>
+                      <span className="flex items-center gap-2">
+                        <span>{cfg.icon}</span>
+                        <span>{linha}</span>
+                      </span>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Campo 2 — Nome da Tecnologia (filtrado pela categoria) */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">
+              Nome da tecnologia <span className="text-destructive">*</span>
+            </Label>
+            <Select
+              value={tecnologiaId}
+              onValueChange={setTecnologiaId}
+              disabled={!linhaAcao}
+            >
+              <SelectTrigger className="h-10">
+                <SelectValue
+                  placeholder={
+                    linhaAcao
+                      ? "Selecione a tecnologia..."
+                      : "Selecione uma categoria primeiro"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {tecnologiasFiltradas.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.nome}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          <div className="md:col-span-2">
-            <Label>Famílias Beneficiadas (Opcional)</Label>
-            <CurrencyInput
-              step={1}
-              value={familias !== "" ? Number(familias) : undefined}
-              onChange={(v) =>
-                setFamilias(v !== undefined ? String(v) : "")
-              }
-              placeholder="Informe o número total de famílias atendidas"
-            />
+          {/* Campo 3 — Quantidade + Unidade (mesma linha) */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">
+                Quantidade implementada{" "}
+                <span className="text-destructive">*</span>
+              </Label>
+              <CurrencyInput
+                step={1}
+                value={quantidade !== "" ? Number(quantidade) : undefined}
+                onChange={(v) =>
+                  setQuantidade(v !== undefined ? String(v) : "")
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">
+                Unidade <span className="text-destructive">*</span>
+              </Label>
+              <Select value={unidade} onValueChange={setUnidade}>
+                <SelectTrigger className="h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {["unidades", "hectares", "famílias"].map((u) => (
+                    <SelectItem key={u} value={u}>
+                      {u}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          <div className="md:col-span-2">
-            <Label>
-              Municípios Atendidos{" "}
-              <span className="text-destructive">*</span>
+          {/* Campo 4 — Municípios atendidos */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">
+              Municípios atendidos <span className="text-destructive">*</span>
             </Label>
             <Input
               value={municipios}
@@ -1058,8 +1101,9 @@ function TecnologiaModal({
             />
           </div>
 
-          <div className="md:col-span-2">
-            <Label>Comunidades Atendidas</Label>
+          {/* Campo 5 — Comunidades */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">Comunidades</Label>
             <Input
               value={comunidades}
               onChange={(e) => setComunidades(e.target.value)}
@@ -1067,46 +1111,50 @@ function TecnologiaModal({
             />
           </div>
 
-          <div>
-            <Label>
-              Projeto Vinculado <span className="text-destructive">*</span>
-            </Label>
-            <Select value={projetoId || undefined} onValueChange={setProjetoId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o projeto" />
-              </SelectTrigger>
-              <SelectContent>
-                {projetos.length > 0 ? (
-                  projetos
-                    .filter((p) => p.id && String(p.id).trim() !== "")
-                    .map((p) => (
-                      <SelectItem key={p.id} value={String(p.id)}>
-                        {p.nome}
-                      </SelectItem>
-                    ))
-                ) : (
-                  <SelectItem value="none" disabled>
-                    Nenhum projeto cadastrado
-                  </SelectItem>
-                )}
-              </SelectContent>
-            </Select>
+          {/* Campo 6 — Projeto + Data */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">
+                Projeto vinculado <span className="text-destructive">*</span>
+              </Label>
+              <Select value={projetoId} onValueChange={setProjetoId}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Selecione o projeto" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projetos.length > 0 ? (
+                    projetos
+                      .filter((p) => p.id && String(p.id).trim() !== "")
+                      .map((p) => (
+                        <SelectItem key={p.id} value={String(p.id)}>
+                          {p.nome}
+                        </SelectItem>
+                      ))
+                  ) : (
+                    <SelectItem value="none" disabled>
+                      Nenhum projeto cadastrado
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">
+                Data de implementação{" "}
+                <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                type="date"
+                value={data}
+                onChange={(e) => setData(e.target.value)}
+                className="h-10"
+              />
+            </div>
           </div>
 
-          <div>
-            <Label>
-              Data de Implementação{" "}
-              <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              type="date"
-              value={data}
-              onChange={(e) => setData(e.target.value)}
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <Label>Observações adicionais</Label>
+          {/* Campo 7 — Observações */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">Observações</Label>
             <Textarea
               value={observacoes}
               onChange={(e) => setObservacoes(e.target.value)}
@@ -1116,23 +1164,32 @@ function TecnologiaModal({
           </div>
 
           {editing && editingOwnership && (
-            <div className="md:col-span-2">
-              <CollaboratorsSection
-                type="tecnologia"
-                id={editing.id}
-                ownership={editingOwnership}
-                currentEmail={currentEmail}
-              />
-            </div>
+            <CollaboratorsSection
+              type="tecnologia"
+              id={editing.id}
+              ownership={editingOwnership}
+              currentEmail={currentEmail}
+            />
           )}
         </div>
 
-        <DialogFooter>
+        {/* Footer */}
+        <div className="px-6 pb-6 flex justify-end gap-2 border-t pt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={submit}>Salvar</Button>
-        </DialogFooter>
+          <Button
+            onClick={submit}
+            style={
+              linhaConfig
+                ? { background: linhaConfig.bg, color: linhaConfig.text }
+                : undefined
+            }
+            className="font-semibold"
+          >
+            Salvar
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -228,20 +228,10 @@ export const fetchTecnologias = async () => {
     if (data) {
       tecnologias = data.map((row: any) => {
         const linha = row.tecnologias?.linha_acao || "";
-        let categoria: CategoriaTec = "hidrica";
-        if (linha === "Convivência com o Semiárido e Segurança Hídrica") {
-          categoria = "hidrica";
-        } else if (linha === "Saneamento Rural") {
-          categoria = "saneamento";
-        } else if (linha === "Energias Renováveis") {
-          categoria = "energia";
-        } else if (linha === "Agroecologia e Produção Sustentável") {
-          categoria = "agroecologia";
-        } else if (linha === "Fortalecimento Organizativo") {
-          categoria = "formacao";
-        } else if (linha === "Direitos e Cidadania") {
-          categoria = "comunicacao";
-        }
+        const foundCat = (Object.keys(CATEGORIAS) as CategoriaTec[]).find(
+          (key) => CATEGORIAS[key].label === linha
+        );
+        const categoria: CategoriaTec = foundCat || "hidrica";
 
         return {
           id: row.id,
@@ -265,7 +255,6 @@ export const fetchTecnologias = async () => {
 };
 
 const getOrCreateCatalogTechId = async (nome: string, categoria: CategoriaTec): Promise<string | null> => {
-  const lineId = catToLineId[categoria] || 1;
   try {
     const { data } = await supabase
       .from("tecnologias")
@@ -279,8 +268,8 @@ const getOrCreateCatalogTechId = async (nome: string, categoria: CategoriaTec): 
       .from("tecnologias")
       .insert({
         nome,
-        linha_de_acao_id: lineId,
-        tipo_entrega: categoria === "formacao" || categoria === "comunicacao" || categoria === "inclusao" ? "Metodológica" : "Física",
+        linha_acao: CATEGORIAS[categoria]?.label || "Convivência com o Semiárido e Segurança Hídrica",
+        ativo: true,
       })
       .select("id")
       .single();
