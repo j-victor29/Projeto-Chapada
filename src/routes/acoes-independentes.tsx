@@ -9,13 +9,6 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Dialog,
   DialogContent,
   DialogTitle,
@@ -73,24 +66,17 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  useComunidadesAutocomplete,
   useIbgeAutocomplete,
   useFavoritos,
 } from "@/lib/autocompleteHooks";
+import { TipoAcaoSelect } from "@/components/TipoAcaoSelect";
+import { LocalComunidadeSelect } from "@/components/LocalComunidadeSelect";
 
 export const Route = createFileRoute("/acoes-independentes")({
   component: AcoesIndependentesPage,
 });
 
 const PAGE_SIZE = 10;
-const TIPOS = [
-  "Oficina",
-  "Encontro",
-  "Entrega",
-  "Visita Técnica",
-  "Capacitação",
-  "Reunião",
-];
 
 interface Anexo {
   nome: string;
@@ -123,14 +109,6 @@ const intOrUndef = (s: string) => {
   return Number.isFinite(n) && n >= 0 ? n : undefined;
 };
 
-// ─── Utilitário: Title Case ──────────────────────────────────────────────────
-function toTitleCase(str: string): string {
-  return str
-    .trim()
-    .toLowerCase()
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
 const toFormState = (a: AtividadeFull): FormState => ({
   projetoId: "",
   titulo: a.titulo ?? "",
@@ -162,6 +140,7 @@ function AcoesIndependentesPage() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [anexos, setAnexos] = useState<Anexo[]>([]);
   const [toDelete, setToDelete] = useState<AtividadeFull | null>(null);
+  const [localType, setLocalType] = useState<"comunidade" | "local" | null>(null);
   const { email: currentEmail, name: currentName } = useCurrentUser();
   const editingOwnership = useOwnership("atividade", editingId ?? "");
 
@@ -205,42 +184,9 @@ function AcoesIndependentesPage() {
     });
   }, [municipioInput, munSuggestions, favoritos, dbMunicipios, isFavorito]);
 
-  // ── Estado: Comunidades autocomplete ────────────────────────────────────
-  const [comunidadeInput, setComunidadeInput] = useState("");
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [savingComunidade, setSavingComunidade] = useState(false);
-  const comunidadeInputRef = useRef<HTMLInputElement>(null);
-  const suggestionsRef = useRef<HTMLDivElement>(null);
-  const { suggestions: comunidadeSuggestions, loading: comunidadeLoading } =
-    useComunidadesAutocomplete(comunidadeInput);
-
-  const displayComSuggestions = useMemo(() => {
-    if (comunidadeInput.trim().length < 2) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const favNomes = favoritos.filter((f: any) => f.tipo === "comunidade").map((f: any) => f.item_nome);
-      return favNomes.map((nome: string) => ({ id: nome, nome }));
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return [...comunidadeSuggestions].sort((a: any, b: any) => {
-      const aFav = isFavorito("comunidade", a.nome);
-      const bFav = isFavorito("comunidade", b.nome);
-      if (aFav && !bFav) return -1;
-      if (!aFav && bFav) return 1;
-      return 0;
-    });
-  }, [comunidadeInput, comunidadeSuggestions, favoritos, isFavorito]);
-
-  // Fecha dropdowns ao clicar fora
+  // Fecha dropdown de município ao clicar fora
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (
-        comunidadeInputRef.current &&
-        !comunidadeInputRef.current.contains(e.target as Node) &&
-        suggestionsRef.current &&
-        !suggestionsRef.current.contains(e.target as Node)
-      ) {
-        setShowSuggestions(false);
-      }
       if (
         municipioInputRef.current &&
         !municipioInputRef.current.contains(e.target as Node) &&
@@ -286,41 +232,6 @@ function AcoesIndependentesPage() {
       setSavingMunicipio(false);
     }
   }, [dbMunicipios, queryClient]);
-
-  // ── Adicionar Comunidade (banco + auto-criar se nova) ────────────────────
-  const addComunidade = useCallback(async (nomeRaw: string) => {
-    const normalized = toTitleCase(nomeRaw);
-    if (!normalized) return;
-
-    setSavingComunidade(true);
-    try {
-      const { data: existing } = await supabase
-        .from("comunidades")
-        .select("id, nome")
-        .ilike("nome", normalized)
-        .limit(1);
-
-      if (existing && existing.length > 0) {
-        toast.info("Comunidade já cadastrada — vinculando ao registro existente.", { duration: 2000 });
-        setForm((f) => ({ ...f, local: existing[0].nome }));
-      } else {
-        const { data: inserted, error } = await supabase
-          .from("comunidades")
-          .insert({ nome: normalized, criado_via: "atividade" })
-          .select("id, nome")
-          .single();
-        if (error || !inserted) throw error ?? new Error("Falha ao salvar comunidade.");
-        await queryClient.invalidateQueries({ queryKey: ["comunidades"] });
-        setForm((f) => ({ ...f, local: inserted.nome }));
-      }
-      setComunidadeInput("");
-      setShowSuggestions(false);
-    } catch (err: unknown) {
-      toast.error(`Erro ao selecionar local: ${(err as Error).message}`);
-    } finally {
-      setSavingComunidade(false);
-    }
-  }, [queryClient]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -394,7 +305,7 @@ function AcoesIndependentesPage() {
     setForm(emptyForm);
     setAnexos([]);
     setMunicipioInput("");
-    setComunidadeInput("");
+    setLocalType(null);
     setOpen(true);
   };
 
@@ -407,7 +318,7 @@ function AcoesIndependentesPage() {
     setForm(toFormState(a));
     setAnexos(a.anexos ?? []);
     setMunicipioInput("");
-    setComunidadeInput("");
+    setLocalType(null);
     setOpen(true);
   };
 
@@ -648,18 +559,11 @@ function AcoesIndependentesPage() {
             </div>
             <div>
               <Label>Tipo de Ação *</Label>
-              <Select value={form.tipo || undefined} onValueChange={setF("tipo")}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  {TIPOS.filter(t => t && String(t).trim() !== "").map((t) => (
-                    <SelectItem key={t} value={String(t)}>
-                      {t}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <TipoAcaoSelect
+                value={form.tipo}
+                onValueChange={setF("tipo")}
+                disabled={saving}
+              />
             </div>
 
             {/* ── MUNICÍPIO — Autocomplete IBGE ───────────────────────────── */}
@@ -744,109 +648,16 @@ function AcoesIndependentesPage() {
               )}
             </div>
 
-            {/* ── LOCAL / COMUNIDADE — Autocomplete banco ───────────────────── */}
+            {/* ── LOCAL / COMUNIDADE — Autocomplete unificado ────────────────── */}
             <div>
               <Label>Local / Comunidade</Label>
-              {form.local ? (
-                <div className="flex items-center gap-2 mt-2">
-                  <Badge variant="secondary" className="gap-1 px-2.5 py-1 text-xs font-medium">
-                    {form.local}
-                    <button
-                      type="button"
-                      onClick={() => setForm((f) => ({ ...f, local: "" }))}
-                      className="ml-1 hover:text-destructive transition-colors"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                </div>
-              ) : (
-                <div className="relative mt-2">
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Input
-                        ref={comunidadeInputRef}
-                        value={comunidadeInput}
-                        onChange={(e) => {
-                          setComunidadeInput(e.target.value);
-                          setShowSuggestions(true);
-                        }}
-                        onFocus={() => setShowSuggestions(true)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            addComunidade(comunidadeInput);
-                          }
-                          if (e.key === "Escape") setShowSuggestions(false);
-                        }}
-                        placeholder="Buscar ou criar local/comunidade..."
-                        className="text-xs pr-8"
-                        disabled={savingComunidade}
-                      />
-                      {(savingComunidade || comunidadeLoading) && (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                      )}
-                    </div>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => addComunidade(comunidadeInput)}
-                      disabled={savingComunidade || !comunidadeInput.trim()}
-                      className="h-9 shrink-0"
-                      title="Confirmar/criar local"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  {showSuggestions && (
-                    <div
-                      ref={suggestionsRef}
-                      className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg overflow-hidden max-h-60 overflow-y-auto"
-                    >
-                      {displayComSuggestions.length > 0 ? (
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        displayComSuggestions.map((c: any) => {
-                          const isFav = isFavorito("comunidade", c.nome);
-                          return (
-                            <button
-                              key={c.id}
-                              type="button"
-                              className="w-full text-left px-3 py-2 text-xs hover:bg-accent transition-colors flex items-center gap-2"
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                addComunidade(c.nome);
-                              }}
-                            >
-                              {isFav ? (
-                                <Star className="h-3.5 w-3.5 fill-primary text-primary shrink-0" />
-                              ) : (
-                                <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                              )}
-                              <span className="font-medium">{c.nome}</span>
-                            </button>
-                          );
-                        })
-                      ) : comunidadeInput.trim().length >= 2 && !comunidadeLoading ? (
-                        <div className="px-3 py-2 text-xs text-muted-foreground flex items-center justify-between">
-                          <span>Nenhuma comunidade encontrada.</span>
-                          <button
-                            type="button"
-                            className="text-primary font-medium flex items-center gap-1"
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              addComunidade(comunidadeInput);
-                            }}
-                          >
-                            <Plus className="h-3 w-3" /> Criar nova
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                  )}
-                </div>
-              )}
+              <LocalComunidadeSelect
+                value={form.local}
+                onValueChange={setF("local")}
+                localType={localType}
+                onLocalTypeChange={setLocalType}
+                disabled={saving}
+              />
             </div>
 
             <div className="md:col-span-2">
