@@ -17,6 +17,7 @@ export interface Comunidade {
   nome: string;
   municipio_id?: string | null;
   tipo?: string | null;
+  categoria?: string | null;
   created_at?: string;
 }
 
@@ -155,12 +156,21 @@ function makeCrud<T extends { id: string }>(
   };
 }
 
+export interface TipoAcao {
+  id: string;
+  nome: string;
+  padrao: boolean;
+  criado_via?: string | null;
+  created_at?: string;
+}
+
 export const Municipios = makeCrud<Municipio>("municipios", "municipios");
 export const Comunidades = makeCrud<Comunidade>("comunidades", "comunidades");
 export const Financiadores = makeCrud<Financiador>("financiadores", "financiadores");
 export const Categorias = makeCrud<Categoria>("categorias", "categorias");
 export const Publicos = makeCrud<Publico>("publicos", "publicos");
 export const Familias = makeCrud<Familia>("beneficiarios", "familias", "nome_responsavel");
+export const TiposAcao = makeCrud<TipoAcao>("tipos_acao", "tipos_acao");
 
 // ─── Linhas de Ação ──────────────────────────────────────────────────────────
 export const LinhasAcao = {

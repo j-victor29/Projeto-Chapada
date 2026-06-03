@@ -194,8 +194,8 @@ export interface LocalSuggestion {
 }
 
 // ─── Hook: Autocomplete Unificado Local/Comunidade ───────────────────────────
-// Busca simultaneamente em `comunidades` e `locais`, retorna lista unificada
-// com campo `fonte` para distinção visual (🏘️ Comunidade / 📍 Local).
+// Busca na tabela `comunidades`, retorna lista unificada
+// com campo `fonte` mapeado a partir da coluna `categoria`.
 export function useLocaisAutocomplete(query: string) {
   const [suggestions, setSuggestions] = useState<LocalSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
@@ -209,33 +209,24 @@ export function useLocaisAutocomplete(query: string) {
       setLoading(true);
       const term = query.trim();
 
-      const [resComunidades, resLocais] = await Promise.all([
-        supabase
-          .from("comunidades")
-          .select("id, nome")
-          .ilike("nome", `%${term}%`)
-          .order("nome")
-          .limit(6),
-        supabase
-          .from("locais")
-          .select("id, nome")
-          .ilike("nome", `%${term}%`)
-          .order("nome")
-          .limit(6),
-      ]);
+      const { data, error } = await supabase
+        .from("comunidades")
+        .select("id, nome, categoria")
+        .ilike("nome", `%${term}%`)
+        .order("nome")
+        .limit(12);
 
-      const comunidades: LocalSuggestion[] = (resComunidades.data ?? []).map((c) => ({
-        id: c.id,
-        nome: c.nome,
-        fonte: "comunidade" as const,
-      }));
-      const locais: LocalSuggestion[] = (resLocais.data ?? []).map((l) => ({
-        id: l.id,
-        nome: l.nome,
-        fonte: "local" as const,
-      }));
-
-      setSuggestions([...comunidades, ...locais]);
+      if (error) {
+        console.error("Erro no autocomplete de locais:", error);
+        setSuggestions([]);
+      } else {
+        const items: LocalSuggestion[] = (data ?? []).map((c) => ({
+          id: c.id,
+          nome: c.nome,
+          fonte: c.categoria === "Local/Espaço" ? "local" : "comunidade",
+        }));
+        setSuggestions(items);
+      }
       setLoading(false);
     }, 300);
     return () => clearTimeout(timer);
@@ -252,9 +243,9 @@ export interface LocalSalvo {
 }
 
 // ─── Hook: Salvar Local com Deduplicação ─────────────────────────────────────
-// Antes de inserir, verifica AMBAS as tabelas (comunidades e locais).
-// Se já existir em qualquer uma, vincula ao registro existente.
-// Se não existir, cria na tabela correspondente ao `tipo` informado.
+// Verifica se já existe na tabela `comunidades` por nome.
+// Se já existir, vincula ao registro existente.
+// Se não existir, cria com a categoria correspondente.
 export function useSalvarLocal() {
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
@@ -267,47 +258,42 @@ export function useSalvarLocal() {
       setSaving(true);
       try {
         // 1. Checar em comunidades
-        const { data: existeCom } = await supabase
+        const { data: existeCom, error: checkError } = await supabase
           .from("comunidades")
-          .select("id, nome")
+          .select("id, nome, categoria")
           .ilike("nome", nome)
           .limit(1);
+
+        if (checkError) throw checkError;
 
         if (existeCom && existeCom.length > 0) {
-          return { nome: existeCom[0].nome, fonte: "comunidade", jaExistia: true };
+          return {
+            nome: existeCom[0].nome,
+            fonte: existeCom[0].categoria === "Local/Espaço" ? "local" : "comunidade",
+            jaExistia: true,
+          };
         }
 
-        // 2. Checar em locais
-        const { data: existeLoc } = await supabase
-          .from("locais")
-          .select("id, nome")
-          .ilike("nome", nome)
-          .limit(1);
+        // 2. Não existe — inserir com a categoria correta
+        const categoriaFinal = tipo === "comunidade" ? "Comunidade" : "Local/Espaço";
+        const { data: inserted, error: insertError } = await supabase
+          .from("comunidades")
+          .insert({
+            nome,
+            categoria: categoriaFinal,
+            criado_via: "atividade",
+          })
+          .select("id, nome, categoria")
+          .single();
 
-        if (existeLoc && existeLoc.length > 0) {
-          return { nome: existeLoc[0].nome, fonte: "local", jaExistia: true };
-        }
+        if (insertError || !inserted) throw insertError ?? new Error("Falha ao salvar local.");
 
-        // 3. Não existe — inserir na tabela correta
-        if (tipo === "comunidade") {
-          const { data: inserted, error } = await supabase
-            .from("comunidades")
-            .insert({ nome, criado_via: "atividade" })
-            .select("id, nome")
-            .single();
-          if (error || !inserted) throw error ?? new Error("Falha ao salvar comunidade.");
-          await queryClient.invalidateQueries({ queryKey: ["comunidades"] });
-          return { nome: inserted.nome, fonte: "comunidade", jaExistia: false };
-        } else {
-          const { data: inserted, error } = await supabase
-            .from("locais")
-            .insert({ nome, criado_via: "formulario" })
-            .select("id, nome")
-            .single();
-          if (error || !inserted) throw error ?? new Error("Falha ao salvar local.");
-          await queryClient.invalidateQueries({ queryKey: ["locais"] });
-          return { nome: inserted.nome, fonte: "local", jaExistia: false };
-        }
+        await queryClient.invalidateQueries({ queryKey: ["comunidades"] });
+        return {
+          nome: inserted.nome,
+          fonte: inserted.categoria === "Local/Espaço" ? "local" : "comunidade",
+          jaExistia: false,
+        };
       } finally {
         setSaving(false);
       }
@@ -317,3 +303,4 @@ export function useSalvarLocal() {
 
   return { salvar, saving };
 }
+

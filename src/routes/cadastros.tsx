@@ -13,10 +13,11 @@ import { Plus, Trash2, Pencil, Search, X, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Municipios, Comunidades, Financiadores, Categorias, Publicos, Familias,
-  CatalogoTecnologias, LinhasAcao,
+  CatalogoTecnologias, LinhasAcao, TiposAcao,
 } from "@/lib/cadastrosStore";
 import { toast } from "sonner";
 import { useDebounce } from "@/hooks/use-debounce";
+import { toTitleCase } from "@/lib/autocompleteHooks";
 
 export const Route = createFileRoute("/cadastros")({
   component: CadastrosPage,
@@ -36,6 +37,7 @@ function CadastrosPage() {
             <TabsTrigger value="publicos">Públicos</TabsTrigger>
             <TabsTrigger value="familias">Famílias</TabsTrigger>
             <TabsTrigger value="tecnologias">Tecnologias</TabsTrigger>
+            <TabsTrigger value="tipos_acao">Tipos de Ação</TabsTrigger>
           </TabsList>
           
           <TabsContent value="municipios" className="mt-4"><MunicipiosTab /></TabsContent>
@@ -45,6 +47,7 @@ function CadastrosPage() {
           <TabsContent value="publicos" className="mt-4"><PublicosTab /></TabsContent>
           <TabsContent value="familias" className="mt-4"><FamiliasTab /></TabsContent>
           <TabsContent value="tecnologias" className="mt-4"><TecnologiasTab /></TabsContent>
+          <TabsContent value="tipos_acao" className="mt-4"><TiposAcaoTab /></TabsContent>
         </Tabs>
       </div>
     </AppLayout>
@@ -52,7 +55,7 @@ function CadastrosPage() {
 }
 
 function CrudShell({
-  title, items, columns, renderForm, onSave, onDelete, getId, getRowValues, blank,
+  title, items, columns, renderForm, onSave, onDelete, getId, getRowValues, blank, canEdit, canDelete,
 }: {
   title: string;
   items: any[] | undefined;
@@ -63,6 +66,8 @@ function CrudShell({
   getId: (row: any) => string;
   getRowValues: (row: any) => Record<string, any>;
   blank: any;
+  canEdit?: (row: any) => boolean;
+  canDelete?: (row: any) => boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<any>(blank);
@@ -151,30 +156,34 @@ function CrudShell({
                     </td>
                   ))}
                   <td className="px-4 py-2.5 text-right whitespace-nowrap space-x-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 hover:bg-muted/80 text-muted-foreground hover:text-foreground"
-                      onClick={() => { setDraft({ ...row }); setOpen(true); }}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                      onClick={async () => {
-                        if (!confirm("Tem certeza que deseja excluir este registro?")) return;
-                        try {
-                          await onDelete(getId(row));
-                          toast.success("Registro excluído com sucesso!");
-                        } catch (e: any) {
-                          toast.error(e.message ?? "Erro ao excluir o registro");
-                        }
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {(!canEdit || canEdit(row)) && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 hover:bg-muted/80 text-muted-foreground hover:text-foreground"
+                        onClick={() => { setDraft({ ...row }); setOpen(true); }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {(!canDelete || canDelete(row)) && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                        onClick={async () => {
+                          if (!confirm("Tem certeza que deseja excluir este registro?")) return;
+                          try {
+                            await onDelete(getId(row));
+                            toast.success("Registro excluído com sucesso!");
+                          } catch (e: any) {
+                            toast.error(e.message ?? "Erro ao excluir o registro");
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -395,50 +404,205 @@ function ComunidadesTab() {
   const { data: muns } = Municipios.useList();
   const upsert = Comunidades.useUpsert();
   const del = Comunidades.useDelete();
+
+  const [filter, setFilter] = useState<"todos" | "comunidade" | "local">("todos");
   
   const munMap = useMemo(() => new Map((muns ?? []).map((m) => [m.id, m.nome])), [muns]);
+
+  const filteredData = useMemo(() => {
+    if (!data) return [];
+    if (filter === "comunidade") {
+      return data.filter((c) => c.categoria === "Comunidade");
+    }
+    if (filter === "local") {
+      return data.filter((c) => c.categoria === "Local/Espaço");
+    }
+    return data;
+  }, [data, filter]);
   
   return (
+    <div className="space-y-4">
+      {/* Filtro superior */}
+      <div className="flex gap-2 p-1 bg-muted/30 w-fit rounded-lg border border-border/50">
+        <Button
+          variant={filter === "todos" ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setFilter("todos")}
+          className="h-8 text-xs px-4"
+        >
+          Todos
+        </Button>
+        <Button
+          variant={filter === "comunidade" ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setFilter("comunidade")}
+          className="h-8 text-xs px-4"
+        >
+          Comunidades
+        </Button>
+        <Button
+          variant={filter === "local" ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setFilter("local")}
+          className="h-8 text-xs px-4"
+        >
+          Locais / Espaços
+        </Button>
+      </div>
+
+      <CrudShell
+        title="Comunidades & Locais/Espaços"
+        items={filteredData}
+        columns={[
+          { label: "Nome", key: "nome" },
+          { label: "Município", key: "_mun" },
+          { label: "Categoria", key: "categoria" },
+          { label: "Tipo / Natureza", key: "tipo" }
+        ]}
+        getId={(r) => r.id}
+        getRowValues={(r) => ({ 
+          ...r, 
+          _mun: r.municipio_id ? munMap.get(r.municipio_id) : "" 
+        })}
+        blank={{ nome: "", municipio_id: null, tipo: "", categoria: "Comunidade" }}
+        renderForm={(s, set) => (
+          <>
+            <div className="space-y-1">
+              <Label htmlFor="com-nome">Nome <span className="text-destructive">*</span></Label>
+              <Input 
+                id="com-nome" 
+                value={s.nome ?? ""} 
+                onChange={(e) => set({ ...s, nome: e.target.value })} 
+                placeholder="Ex: Vila Esperança"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="com-categoria">Categoria <span className="text-destructive">*</span></Label>
+              <Select 
+                value={s.categoria || "Comunidade"} 
+                onValueChange={(v) => set({ ...s, categoria: v })}
+              >
+                <SelectTrigger id="com-categoria">
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Comunidade">Comunidade</SelectItem>
+                  <SelectItem value="Local/Espaço">Local / Espaço</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="com-tipo">Tipo / Natureza (Opcional)</Label>
+              <Input 
+                id="com-tipo" 
+                value={s.tipo ?? ""} 
+                placeholder="Ex: Quilombola, Assentamento, Escola Municipal..." 
+                onChange={(e) => set({ ...s, tipo: e.target.value })} 
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="com-municipio">Município (Opcional)</Label>
+              <Select 
+                value={s.municipio_id || undefined} 
+                onValueChange={(v) => set({ ...s, municipio_id: v || null })}
+              >
+                <SelectTrigger id="com-municipio">
+                  <SelectValue placeholder="Selecione um município..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {(muns ?? []).map((m) => (
+                    <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        )}
+        onSave={async (s) => {
+          if (!s.nome || !s.nome.trim()) {
+            throw new Error("O nome é obrigatório.");
+          }
+          if (!s.categoria) {
+            throw new Error("A categoria é obrigatória.");
+          }
+
+          const nomeNormalizado = toTitleCase(s.nome.trim());
+          
+          // Verificar duplicata
+          const duplicado = (data ?? []).some(
+            (c) => 
+              c.nome.toLowerCase() === nomeNormalizado.toLowerCase() && 
+              c.id !== s.id
+          );
+          if (duplicado) {
+            throw new Error(`Já existe uma comunidade ou local com o nome "${nomeNormalizado}".`);
+          }
+
+          await upsert.mutateAsync({
+            ...s,
+            nome: nomeNormalizado,
+            tipo: s.tipo?.trim() || null,
+          });
+        }}
+        onDelete={(id) => del.mutateAsync(id)}
+      />
+    </div>
+  );
+}
+
+function TiposAcaoTab() {
+  const { data } = TiposAcao.useList();
+  const upsert = TiposAcao.useUpsert();
+  const del = TiposAcao.useDelete();
+
+  return (
     <CrudShell
-      title="Comunidades"
+      title="Tipos de Ação"
       items={data}
       columns={[
         { label: "Nome", key: "nome" },
-        { label: "Município", key: "_mun" },
-        { label: "Tipo", key: "tipo" }
+        { label: "Origem", key: "_origem" }
       ]}
       getId={(r) => r.id}
-      getRowValues={(r) => ({ ...r, _mun: r.municipio_id ? munMap.get(r.municipio_id) : "" })}
-      blank={{ nome: "", municipio_id: null, tipo: "" }}
+      getRowValues={(r) => ({
+        ...r,
+        _origem: r.padrao ? "Sistema" : "Usuário"
+      })}
+      blank={{ nome: "", padrao: false, criado_via: "usuario" }}
+      canEdit={(row) => !row.padrao}
+      canDelete={(row) => !row.padrao}
       renderForm={(s, set) => (
-        <>
-          <div className="space-y-1">
-            <Label htmlFor="com-nome">Nome</Label>
-            <Input id="com-nome" value={s.nome ?? ""} onChange={(e) => set({ ...s, nome: e.target.value })} />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="com-municipio">Município</Label>
-            <Select 
-              value={s.municipio_id || undefined} 
-              onValueChange={(v) => set({ ...s, municipio_id: v || null })}
-            >
-              <SelectTrigger id="com-municipio">
-                <SelectValue placeholder="Selecione um município..." />
-              </SelectTrigger>
-              <SelectContent>
-                {(muns ?? []).map((m) => (
-                  <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="com-tipo">Tipo</Label>
-            <Input id="com-tipo" value={s.tipo ?? ""} placeholder="ex.: assentamento, quilombola..." onChange={(e) => set({ ...s, tipo: e.target.value })} />
-          </div>
-        </>
+        <div className="space-y-1">
+          <Label htmlFor="tipo-nome">Nome do Tipo <span className="text-destructive">*</span></Label>
+          <Input
+            id="tipo-nome"
+            value={s.nome ?? ""}
+            onChange={(e) => set({ ...s, nome: e.target.value })}
+            placeholder="Ex: Webinar Técnico"
+          />
+        </div>
       )}
-      onSave={(s) => upsert.mutateAsync(s)}
+      onSave={async (s) => {
+        if (!s.nome || !s.nome.trim()) {
+          throw new Error("O nome é obrigatório.");
+        }
+        const nomeNormalizado = toTitleCase(s.nome.trim());
+
+        // Verificar duplicata
+        const duplicado = (data ?? []).some(
+          (t) => t.nome.toLowerCase() === nomeNormalizado.toLowerCase() && t.id !== s.id
+        );
+        if (duplicado) {
+          throw new Error(`Já existe um tipo de ação com o nome "${nomeNormalizado}".`);
+        }
+
+        await upsert.mutateAsync({
+          ...s,
+          nome: nomeNormalizado,
+          padrao: false,
+          criado_via: "usuario"
+        });
+      }}
       onDelete={(id) => del.mutateAsync(id)}
     />
   );
