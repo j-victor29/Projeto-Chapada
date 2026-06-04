@@ -26,6 +26,7 @@ import {
 import { ProfileModal } from "./ProfileModal";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
+import { ThemeToggle } from "./ThemeToggle";
 
 const typeIcon: Record<NotificationType, ReactNode> = {
   atividade: <ClipboardList className="h-4 w-4 text-primary" />,
@@ -201,6 +202,8 @@ export function AppLayout({
             <span className="text-xs font-medium truncate max-w-[180px]">{displayName}</span>
             <span className="text-[10px] text-muted-foreground truncate max-w-[180px]">{email}</span>
           </div>
+
+          <ThemeToggle />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
