@@ -29,6 +29,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Pencil,
   Plus,
@@ -40,6 +42,8 @@ import {
   MapPin,
   Info,
   Wrench,
+  Filter,
+  X,
 } from "lucide-react";
 import { formatDate } from "@/lib/mockData";
 import { useProjetos } from "@/lib/projetosStore";
@@ -216,6 +220,28 @@ function TecnologiasPage() {
   // Filtros
   const [searchQuery, setSearchQuery] = useState("");
   const [linhaFiltro, setLinhaFiltro] = useState("all");
+  const [dataDe, setDataDe] = useState("");
+  const [dataAte, setDataAte] = useState("");
+  const [selProjeto, setSelProjeto] = useState("todos");
+
+  const isPeriodInvalid = !!(dataDe && dataAte && dataDe > dataAte);
+
+  const hasActiveFilters = useMemo(() => {
+    return (
+      dataDe !== "" ||
+      dataAte !== "" ||
+      linhaFiltro !== "all" ||
+      selProjeto !== "todos"
+    );
+  }, [dataDe, dataAte, linhaFiltro, selProjeto]);
+
+  const clearFilters = () => {
+    setDataDe("");
+    setDataAte("");
+    setLinhaFiltro("all");
+    setSelProjeto("todos");
+    setSearchQuery("");
+  };
 
   // ── Fetch ────────────────────────────────────────────────────────────────
   const fetchTecnologias = async () => {
@@ -348,9 +374,16 @@ function TecnologiasPage() {
       const matchesLinha =
         linhaFiltro === "all" || t.tecnologias?.linha_acao === linhaFiltro;
 
-      return matchesSearch && matchesLinha;
+      const matchesProjeto =
+        selProjeto === "todos" || t.projeto_id === selProjeto;
+
+      const matchesData =
+        (!dataDe || (t.data && t.data >= dataDe)) &&
+        (!dataAte || (t.data && t.data <= dataAte));
+
+      return matchesSearch && matchesLinha && matchesProjeto && matchesData;
     });
-  }, [tecnologias, searchQuery, linhaFiltro]);
+  }, [tecnologias, searchQuery, linhaFiltro, selProjeto, dataDe, dataAte]);
 
   const grupos = useMemo(() => {
     return filteredTecnologias.reduce((acc, tec) => {
@@ -468,6 +501,83 @@ function TecnologiasPage() {
           </Card>
         </div>
 
+        {/* Card de Filtros: Período + Avançados */}
+        <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
+          <CardContent className="p-4 flex flex-wrap gap-4 items-center justify-between">
+            <div className="flex flex-wrap gap-3 items-center">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Período:</span>
+                <DatePicker
+                  value={dataDe}
+                  onChange={setDataDe}
+                  hasError={isPeriodInvalid}
+                />
+                <span className="text-xs text-muted-foreground">até</span>
+                <DatePicker
+                  value={dataAte}
+                  onChange={setDataAte}
+                  hasError={isPeriodInvalid}
+                />
+              </div>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9 gap-2">
+                    <Filter className="h-4 w-4" />
+                    Filtros Avançados
+                    {hasActiveFilters && (
+                      <Badge variant="secondary" className="ml-1 rounded-sm px-1.5 py-0 text-[10px]">
+                        Ativo
+                      </Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-4 space-y-4" align="start">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Projeto</Label>
+                    <Select value={selProjeto} onValueChange={setSelProjeto}>
+                      <SelectTrigger className="h-9 text-xs">
+                        <SelectValue placeholder="Todos os projetos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos os projetos</SelectItem>
+                        {projetos?.filter(p => p.id && String(p.id).trim() !== "").map((p) => (
+                          <SelectItem key={p.id} value={String(p.id)} className="text-xs">
+                            {p.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Linha de Ação</Label>
+                    <Select value={linhaFiltro} onValueChange={setLinhaFiltro}>
+                      <SelectTrigger className="h-9 text-xs">
+                        <SelectValue placeholder="Todas as linhas" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas as linhas</SelectItem>
+                        {linhasDeAcao.map((linha) => (
+                          <SelectItem key={linha} value={linha} className="text-xs">
+                            {getLinhaConfig(linha).icon} {linha}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 gap-1 text-xs">
+                <X className="h-3.5 w-3.5" /> Limpar filtros
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Barra de busca */}
         <Card>
           <CardContent className="p-4">
@@ -483,7 +593,7 @@ function TecnologiasPage() {
           </CardContent>
         </Card>
 
-        {/* Filtro de Categorias — botões/abas com scroll horizontal */}
+        {/* Filtro visual de Categorias — botões/abas com scroll horizontal */}
         <div
           className="flex gap-2 overflow-x-auto pb-1 scroll-smooth"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}

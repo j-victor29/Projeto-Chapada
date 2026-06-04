@@ -53,7 +53,7 @@ function RegistroPage() {
         options: {
           data: {
             full_name: `${firstName.trim()} ${lastName.trim()}`,
-            role: "visualizador",
+            role: "admin",
           },
         },
       });

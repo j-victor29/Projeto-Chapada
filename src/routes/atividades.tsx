@@ -24,6 +24,8 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,6 +49,7 @@ import {
   Loader2,
   Star,
   Search,
+  Filter,
 } from "lucide-react";
 import { formatDate } from "@/lib/mockData";
 import { Municipios } from "@/lib/cadastrosStore";
@@ -77,6 +80,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   useIbgeAutocomplete,
   useFavoritos,
+  useTiposAcao,
 } from "@/lib/autocompleteHooks";
 import { TipoAcaoSelect } from "@/components/TipoAcaoSelect";
 import { LocalComunidadeSelect } from "@/components/LocalComunidadeSelect";
@@ -155,6 +159,35 @@ function AtividadesPage() {
   const projetos = useProjetos();
   const { query } = useGlobalSearch();
   const queryClient = useQueryClient();
+
+  // ── Estados de Filtro local ──────────────────────────────────────────────
+  const [dataDe, setDataDe] = useState("");
+  const [dataAte, setDataAte] = useState("");
+  const [selProjeto, setSelProjeto] = useState("todos");
+  const [selTipo, setSelTipo] = useState("todos");
+  const [selMunicipio, setSelMunicipio] = useState("todos");
+
+  const { tipos: dbTiposAcao = [] } = useTiposAcao();
+
+  const hasActiveFilters = useMemo(() => {
+    return (
+      dataDe !== "" ||
+      dataAte !== "" ||
+      selProjeto !== "todos" ||
+      selTipo !== "todos" ||
+      selMunicipio !== "todos"
+    );
+  }, [dataDe, dataAte, selProjeto, selTipo, selMunicipio]);
+
+  const isPeriodInvalid = !!(dataDe && dataAte && dataDe > dataAte);
+
+  const clearFilters = () => {
+    setDataDe("");
+    setDataAte("");
+    setSelProjeto("todos");
+    setSelTipo("todos");
+    setSelMunicipio("todos");
+  };
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -263,15 +296,23 @@ function AtividadesPage() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return ordenadas;
     return ordenadas.filter((a) => {
-      const proj = projetoMap.get(a.projetoId)?.nome ?? "";
-      return [a.descricao, a.tipo, a.local, a.responsaveis, a.municipio ?? "", proj]
-        .join(" ")
-        .toLowerCase()
-        .includes(q);
+      if (q) {
+        const proj = projetoMap.get(a.projetoId)?.nome ?? "";
+        const matchesQuery = [a.descricao, a.tipo, a.local, a.responsaveis, a.municipio ?? "", proj]
+          .join(" ")
+          .toLowerCase()
+          .includes(q);
+        if (!matchesQuery) return false;
+      }
+      if (dataDe && a.data < dataDe) return false;
+      if (dataAte && a.data > dataAte) return false;
+      if (selProjeto !== "todos" && a.projetoId !== selProjeto) return false;
+      if (selTipo !== "todos" && a.tipo !== selTipo) return false;
+      if (selMunicipio !== "todos" && a.municipio !== selMunicipio) return false;
+      return true;
     });
-  }, [ordenadas, query, projetoMap]);
+  }, [ordenadas, query, projetoMap, dataDe, dataAte, selProjeto, selTipo, selMunicipio]);
 
   const total = filtered.length;
   const items = filtered.slice(0, visible);
@@ -279,7 +320,7 @@ function AtividadesPage() {
 
   useEffect(() => {
     setVisible(PAGE_SIZE);
-  }, [query]);
+  }, [query, dataDe, dataAte, selProjeto, selTipo, selMunicipio]);
 
   const loadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -443,6 +484,100 @@ function AtividadesPage() {
         </Button>
       }
     >
+      {/* ─── FILTROS DE ATIVIDADES ───────────────────────────────────────────── */}
+      <Card className="mb-4 border-border/50 bg-card/60 backdrop-blur-sm">
+        <CardContent className="p-4 flex flex-wrap gap-4 items-center justify-between">
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Período:</span>
+              <DatePicker
+                value={dataDe}
+                onChange={setDataDe}
+                hasError={isPeriodInvalid}
+              />
+              <span className="text-xs text-muted-foreground">até</span>
+              <DatePicker
+                value={dataAte}
+                onChange={setDataAte}
+                hasError={isPeriodInvalid}
+              />
+            </div>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9 gap-2">
+                  <Filter className="h-4 w-4" />
+                  Filtros Avançados
+                  {hasActiveFilters && (
+                    <Badge variant="secondary" className="ml-1 rounded-sm px-1.5 py-0 text-[10px]">
+                      Ativo
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-4 space-y-4" align="start">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Projeto</Label>
+                  <Select value={selProjeto} onValueChange={setSelProjeto}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Todos os projetos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os projetos</SelectItem>
+                      {projetos.map((p) => (
+                        <SelectItem key={p.id} value={p.id} className="text-xs">
+                          {p.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Tipo de Ação</Label>
+                  <Select value={selTipo} onValueChange={setSelTipo}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Todos os tipos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os tipos de ação</SelectItem>
+                      {dbTiposAcao.map((t) => (
+                        <SelectItem key={t.id} value={t.nome} className="text-xs">
+                          {t.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Município</Label>
+                  <Select value={selMunicipio} onValueChange={setSelMunicipio}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Todos os municípios" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os municípios</SelectItem>
+                      {dbMunicipios.map((m) => (
+                        <SelectItem key={m.id} value={m.nome} className="text-xs">
+                          {m.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 gap-1 text-xs">
+              <X className="h-3.5 w-3.5" /> Limpar filtros
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-4">

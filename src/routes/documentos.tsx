@@ -9,6 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Upload, Trash2, Download, History, FileText, Search, GitBranch, FolderOpen, FileUp } from "lucide-react";
+import { Plus, Upload, Trash2, Download, History, FileText, Search, GitBranch, FolderOpen, FileUp, Filter, X } from "lucide-react";
 import { useDocumentos, useCategorias, useUploadDocumento, useDeleteDocumento, getDocumentoUrl, type Documento } from "@/lib/documentosStore";
 import { useProjetos } from "@/lib/projetosStore";
 import { addNotification } from "@/lib/notificationsStore";
@@ -146,6 +148,28 @@ function DocumentosPage() {
   const [busca, setBusca] = useState("");
   const [filtroCategoria, setFiltroCategoria] = useState("todos");
   const [filtroProjeto, setFiltroProjeto] = useState("todos");
+  const [dataDe, setDataDe] = useState("");
+  const [dataAte, setDataAte] = useState("");
+
+  const isPeriodInvalid = !!(dataDe && dataAte && dataDe > dataAte);
+
+  const hasActiveFilters = useMemo(() => {
+    return (
+      busca !== "" ||
+      filtroCategoria !== "todos" ||
+      filtroProjeto !== "todos" ||
+      dataDe !== "" ||
+      dataAte !== ""
+    );
+  }, [busca, filtroCategoria, filtroProjeto, dataDe, dataAte]);
+
+  const clearFilters = () => {
+    setBusca("");
+    setFiltroCategoria("todos");
+    setFiltroProjeto("todos");
+    setDataDe("");
+    setDataAte("");
+  };
   
   // Delete Dialog State
   const [toDelete, setToDelete] = useState<Documento | null>(null);
@@ -172,10 +196,17 @@ function DocumentosPage() {
       if (filtroCategoria !== "todos" && d.categoria_id !== filtroCategoria) return false;
       // 3. Project Filter
       if (filtroProjeto !== "todos" && d.projeto_id !== filtroProjeto) return false;
+      // 4. Date Period Filter
+      if (dataDe || dataAte) {
+        if (!d.created_at) return false;
+        const docDate = d.created_at.substring(0, 10);
+        if (dataDe && docDate < dataDe) return false;
+        if (dataAte && docDate > dataAte) return false;
+      }
 
       return true;
     });
-  }, [docs, busca, filtroCategoria, filtroProjeto]);
+  }, [docs, busca, filtroCategoria, filtroProjeto, dataDe, dataAte]);
 
   // Main / Root documents (documents that do not have a parent document)
   const rootDocs = useMemo(() => {
@@ -391,44 +422,95 @@ function DocumentosPage() {
       }
     >
       <div className="space-y-4">
-        {/* Filter Section */}
+        {/* Card de Filtros: Período + Avançados */}
         <Card className="border border-muted/80 bg-card/60 backdrop-blur-md shadow-sm rounded-xl overflow-hidden">
-          <CardContent className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por título, descrição ou tag..."
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                className="pl-9 bg-background/50 rounded-lg focus-visible:ring-primary focus-visible:ring-offset-1 border-muted"
-              />
+          <CardContent className="p-4 flex flex-wrap gap-4 items-center justify-between">
+            <div className="flex flex-wrap gap-3 items-center flex-1 min-w-[280px]">
+              <div className="relative flex-1 min-w-[200px] max-w-xs">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por título, descrição ou tag..."
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  className="pl-9 bg-background/50 rounded-lg focus-visible:ring-primary focus-visible:ring-offset-1 border-muted"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Período:</span>
+                <DatePicker
+                  value={dataDe}
+                  onChange={setDataDe}
+                  hasError={isPeriodInvalid}
+                />
+                <span className="text-xs text-muted-foreground">até</span>
+                <DatePicker
+                  value={dataAte}
+                  onChange={setDataAte}
+                  hasError={isPeriodInvalid}
+                />
+              </div>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9 gap-2">
+                    <Filter className="h-4 w-4" />
+                    Filtros Avançados
+                    {(filtroCategoria !== "todos" || filtroProjeto !== "todos") && (
+                      <Badge variant="secondary" className="ml-1 rounded-sm px-1.5 py-0 text-[10px]">
+                        Ativo
+                      </Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-4 space-y-4" align="start">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Categoria</Label>
+                    <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
+                      <SelectTrigger className="h-9 text-xs bg-background/50">
+                        <SelectValue placeholder="Todas as categorias" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos" className="text-xs">Todas as categorias</SelectItem>
+                        {docCats.filter(c => c && c.id).map((c) => (
+                          <SelectItem key={c.id} value={c.id} className="text-xs">
+                            {c.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Projeto</Label>
+                    <Select value={filtroProjeto} onValueChange={setFiltroProjeto}>
+                      <SelectTrigger className="h-9 text-xs bg-background/50">
+                        <SelectValue placeholder="Todos os projetos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos" className="text-xs">Todos os projetos</SelectItem>
+                        {(projs ?? []).filter(p => p && p.id).map((p) => (
+                          <SelectItem key={p.id} value={p.id} className="text-xs">
+                            {p.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </PopoverContent>
+              </Popover>
+
+              {hasActiveFilters && (
+                <Button
+                  variant="ghost"
+                  onClick={clearFilters}
+                  className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
+                >
+                  <X className="h-3 w-3" />
+                  Limpar filtros
+                </Button>
+              )}
             </div>
-            <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
-              <SelectTrigger className="bg-background/50 rounded-lg border-muted focus-visible:ring-primary focus-visible:ring-offset-1">
-                <SelectValue placeholder="Categoria" />
-              </SelectTrigger>
-              <SelectContent className="max-h-60 rounded-lg shadow-lg border">
-                <SelectItem value="todos">Todas as categorias</SelectItem>
-                {docCats.filter(c => c && c.id).map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={filtroProjeto} onValueChange={setFiltroProjeto}>
-              <SelectTrigger className="bg-background/50 rounded-lg border-muted focus-visible:ring-primary focus-visible:ring-offset-1">
-                <SelectValue placeholder="Projeto" />
-              </SelectTrigger>
-              <SelectContent className="max-h-60 rounded-lg shadow-lg border">
-                <SelectItem value="todos">Todos os projetos</SelectItem>
-                {(projs ?? []).filter(p => p && p.id).map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </CardContent>
         </Card>
 

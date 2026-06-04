@@ -15,8 +15,10 @@ import {
   Trash2,
   Pencil,
   Filter,
+  X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +34,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -101,9 +105,34 @@ function ImagensPage() {
   const [toDelete, setToDelete] = useState<ImagemItem | null>(null);
   const [editing, setEditing] = useState<ImagemItem | null>(null);
   const editingOwnership = useOwnership("imagem", editing?.id ?? "");
-  const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null);
+  const [categoriaFiltro, setCategoriaFiltro] = useState<string[]>([]);
   const [dataDe, setDataDe] = useState<string>("");
   const [dataAte, setDataAte] = useState<string>("");
+  const [selProjeto, setSelProjeto] = useState("todos");
+  const [selTipo, setSelTipo] = useState("todos");
+  const [selMunicipio, setSelMunicipio] = useState("todos");
+
+  const hasActiveFilters = useMemo(() => {
+    return (
+      dataDe !== "" ||
+      dataAte !== "" ||
+      categoriaFiltro.length > 0 ||
+      selProjeto !== "todos" ||
+      selTipo !== "todos" ||
+      selMunicipio !== "todos"
+    );
+  }, [dataDe, dataAte, categoriaFiltro, selProjeto, selTipo, selMunicipio]);
+
+  const isPeriodInvalid = !!(dataDe && dataAte && dataDe > dataAte);
+
+  const clearFilters = () => {
+    setDataDe("");
+    setDataAte("");
+    setCategoriaFiltro([]);
+    setSelProjeto("todos");
+    setSelTipo("todos");
+    setSelMunicipio("todos");
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<PendingFile | null>(null);
@@ -119,13 +148,16 @@ function ImagensPage() {
           .toLowerCase()
           .includes(q);
       const matchesCategoria =
-        !categoriaFiltro || i.categoriaId === categoriaFiltro;
+        categoriaFiltro.length === 0 || (i.categoriaId && categoriaFiltro.includes(i.categoriaId));
       const matchesData =
         (!dataDe || (i.dataIso && i.dataIso >= dataDe)) &&
         (!dataAte || (i.dataIso && i.dataIso <= dataAte));
-      return matchesQuery && matchesCategoria && matchesData;
+      const matchesProjeto = selProjeto === "todos" || i.projetoId === selProjeto;
+      const matchesTipo = selTipo === "todos" || i.tipo === selTipo;
+      const matchesMunicipio = selMunicipio === "todos" || i.local === selMunicipio;
+      return matchesQuery && matchesCategoria && matchesData && matchesProjeto && matchesTipo && matchesMunicipio;
     });
-  }, [imgs, query, categoriaFiltro, dataDe, dataAte]);
+  }, [imgs, query, categoriaFiltro, dataDe, dataAte, selProjeto, selTipo, selMunicipio]);
 
   const openPicker = () => fileInputRef.current?.click();
 
@@ -289,81 +321,130 @@ function ImagensPage() {
         </>
       }
     >
-      {/* ─── FILTROS DE PERÍODO ────────────────────────────────────────────── */}
+      {/* ─── FILTROS DE PERÍODO + AVANÇADOS ───────────────────────────────────── */}
       <Card className="mb-4 border-border/50 bg-card/60 backdrop-blur-sm">
-        <CardContent className="p-4 flex flex-wrap gap-4 items-center justify-between">
-          <div className="flex flex-wrap gap-3 items-center">
+        <CardContent className="p-4 flex flex-col gap-3">
+          <div className="flex flex-wrap gap-4 items-center justify-between">
+            <div className="flex flex-wrap gap-3 items-center">
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Período:</span>
-              <Input
-                type="date"
+              <DatePicker
                 value={dataDe}
-                onChange={(e) => setDataDe(e.target.value)}
-                className="h-9 w-36 text-xs"
+                onChange={setDataDe}
+                hasError={isPeriodInvalid}
               />
               <span className="text-xs text-muted-foreground">até</span>
-              <Input
-                type="date"
+              <DatePicker
                 value={dataAte}
-                onChange={(e) => setDataAte(e.target.value)}
-                className="h-9 w-36 text-xs"
+                onChange={setDataAte}
+                hasError={isPeriodInvalid}
               />
-              {(dataDe || dataAte) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setDataDe("");
-                    setDataAte("");
-                  }}
-                  className="h-9 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  Limpar período
-                </Button>
-              )}
             </div>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9 gap-2">
+                  <Filter className="h-4 w-4" />
+                  Filtros Avançados
+                  {hasActiveFilters && (
+                    <Badge variant="secondary" className="ml-1 rounded-sm px-1.5 py-0 text-[10px]">
+                      Ativo
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-4 space-y-4" align="start">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Projeto</Label>
+                  <Select value={selProjeto} onValueChange={setSelProjeto}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Todos os projetos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os projetos</SelectItem>
+                      {projetos?.filter(p => p.id && String(p.id).trim() !== "").map((p) => (
+                        <SelectItem key={p.id} value={String(p.id)} className="text-xs">
+                          {p.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Tipo de Ação</Label>
+                  <Select value={selTipo} onValueChange={setSelTipo}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Todos os tipos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os tipos</SelectItem>
+                      {TIPOS.map((t) => (
+                        <SelectItem key={t} value={t} className="text-xs">
+                          {t}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Município</Label>
+                  <Select value={selMunicipio} onValueChange={setSelMunicipio}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Todos os municípios" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os municípios</SelectItem>
+                      {dbMunicipios.map((m) => (
+                        <SelectItem key={m.id} value={m.nome} className="text-xs">
+                          {m.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Categoria</Label>
+                  <Select 
+                    value={categoriaFiltro.length === 0 ? "todas" : categoriaFiltro[0]} 
+                    onValueChange={(val) => {
+                      if (val === "todas") setCategoriaFiltro([]);
+                      else setCategoriaFiltro([val]);
+                    }}
+                  >
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Todas as categorias" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todas">Todas as categorias</SelectItem>
+                      {categorias.map((c) => (
+                        <SelectItem key={c.id} value={c.id} className="text-xs">
+                          {c.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+              </PopoverContent>
+            </Popover>
           </div>
+
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 gap-1 text-xs">
+              <X className="h-3.5 w-3.5" /> Limpar filtros
+            </Button>
+          )}
+        </div>
         </CardContent>
       </Card>
-
-      {/* ── Barra de filtro por categoria ─────────────────────────── */}
-      {categorias.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap mb-4">
-          <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
-          <button
-            onClick={() => setCategoriaFiltro(null)}
-            className={[
-              "px-3 py-1 rounded-full text-xs font-medium border transition-colors",
-              categoriaFiltro === null
-                ? "bg-primary text-primary-foreground border-primary"
-                : "border-border text-muted-foreground hover:border-primary hover:text-foreground",
-            ].join(" ")}
-          >
-            Todas
-          </button>
-          {categorias.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() =>
-                setCategoriaFiltro(categoriaFiltro === cat.id ? null : cat.id)
-              }
-              className={[
-                "px-3 py-1 rounded-full text-xs font-medium border transition-colors",
-                categoriaFiltro === cat.id
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "border-border text-muted-foreground hover:border-primary hover:text-foreground",
-              ].join(" ")}
-            >
-              {cat.nome}
-            </button>
-          ))}
-        </div>
-      )}
 
       {filtered.length === 0 ? (
         <Card>
           <CardContent className="p-12 text-center text-muted-foreground text-sm">
-            {query || categoriaFiltro || dataDe || dataAte
+            {query || categoriaFiltro.length > 0 || dataDe || dataAte
               ? "Nenhuma imagem encontrada para este filtro."
               : imgs.length === 0
               ? 'Nenhuma imagem na galeria. Clique em "Enviar Imagens" para começar.'
@@ -492,7 +573,7 @@ function ImagensPage() {
             </div>
             {categorias.length > 0 && (
               <div>
-                <Label>Categoria Temática</Label>
+                <Label>Categorias</Label>
                 <Select
                   value={form.categoriaId}
                   onValueChange={(v) => setForm((f) => ({ ...f, categoriaId: v }))}

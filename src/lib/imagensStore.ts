@@ -36,6 +36,16 @@ const subscribeC = (cb: () => void) => {
 };
 const emitC = () => categoriasListeners.forEach((l) => l());
 
+const REQUIRED_CATEGORIES = [
+  "Meio ambiente e sustentabilidade",
+  "Acesso à água e saneamento rural",
+  "Segurança alimentar e geração de renda",
+  "Direitos das crianças e adolescentes",
+  "Protagonismo feminino",
+  "Juventude rural",
+  "Comunicação | Eventos",
+];
+
 export const initCategorias = async () => {
   if (categoriasInitialized) return;
   categoriasInitialized = true;
@@ -47,7 +57,30 @@ export const initCategorias = async () => {
     console.error("[imagensStore] categorias init error:", error);
     return;
   }
-  categorias = (data ?? []).map((r: any) => ({ id: r.id, nome: r.nome }));
+  
+  let dbCategorias = (data ?? []) as { id: string; nome: string }[];
+  
+  // Ensure required categories exist
+  const missingCategories = REQUIRED_CATEGORIES.filter(
+    (reqName) => !dbCategorias.some((c) => c.nome === reqName)
+  );
+  
+  if (missingCategories.length > 0) {
+    const { data: inserted, error: insertError } = await supabase
+      .from("categorias" as any)
+      .insert(missingCategories.map((nome) => ({ nome })))
+      .select("id, nome");
+      
+    if (!insertError && inserted) {
+      dbCategorias = [...dbCategorias, ...(inserted as { id: string; nome: string }[])];
+    }
+  }
+
+  // Only expose the required ones to the UI
+  categorias = dbCategorias
+    .filter((c) => REQUIRED_CATEGORIES.includes(c.nome))
+    .sort((a, b) => a.nome.localeCompare(b.nome));
+
   emitC();
 };
 

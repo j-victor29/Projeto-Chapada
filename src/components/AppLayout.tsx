@@ -19,11 +19,13 @@ import { fullName, initialsFrom, useProfile } from "@/lib/profileStore";
 import {
   clearAll,
   markAllRead,
+  markRead,
   useNotifications,
   type NotificationType,
 } from "@/lib/notificationsStore";
 import { ProfileModal } from "./ProfileModal";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 
 const typeIcon: Record<NotificationType, ReactNode> = {
   atividade: <ClipboardList className="h-4 w-4 text-primary" />,
@@ -59,6 +61,9 @@ export function AppLayout({
   const { query, setQuery } = useGlobalSearch();
   const notifications = useNotifications();
   const [profileOpen, setProfileOpen] = useState(false);
+
+  // ── Tempo real: escuta INSERTs na tabela notificacoes ──────────────────────
+  useRealtimeNotifications();
   const [passwordOpen, setPasswordOpen] = useState(false);
   
   const [localQuery, setLocalQuery] = useState(query);
@@ -163,7 +168,11 @@ export function AppLayout({
                     {notifications.map((n) => (
                       <li
                         key={n.id}
-                        className={`px-4 py-3 flex items-start gap-3 ${
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => markRead(n.id)}
+                        onKeyDown={(e) => e.key === "Enter" && markRead(n.id)}
+                        className={`px-4 py-3 flex items-start gap-3 cursor-pointer hover:bg-muted/40 transition-colors ${
                           n.read ? "" : "bg-primary/5"
                         }`}
                       >
@@ -178,7 +187,7 @@ export function AppLayout({
                           <p className="text-[10px] text-muted-foreground mt-1">{timeAgo(n.createdAt)}</p>
                         </div>
                         {!n.read && (
-                          <span className="mt-1 h-2 w-2 rounded-full bg-primary shrink-0" />
+                          <span className="mt-1 h-2 w-2 rounded-full bg-primary shrink-0" title="Clique para marcar como lida" />
                         )}
                       </li>
                     ))}

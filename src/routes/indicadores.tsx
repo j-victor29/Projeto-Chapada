@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useRef, useMemo } from "react";
+import { useRef, useMemo, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileDown, FileSpreadsheet } from "lucide-react";
+import { FileDown, FileSpreadsheet, X } from "lucide-react";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   ResponsiveContainer,
   BarChart,
@@ -65,14 +66,67 @@ function IndicadoresPage() {
   const barRef = useRef<HTMLDivElement>(null);
   const pieRef = useRef<HTMLDivElement>(null);
 
+  // Filtros
+  const [dataDe, setDataDe] = useState("");
+  const [dataAte, setDataAte] = useState("");
+  const isPeriodInvalid = !!(dataDe && dataAte && dataDe > dataAte);
+
+  const hasActiveFilters = !!(dataDe || dataAte);
+  const clearFilters = () => {
+    setDataDe("");
+    setDataAte("");
+  };
+
   // Aggregate indicators from both linked and independent activities
   const atividadesVinculadas = useAtividades();
   const atividadesIndependentes = useAtividadesIndependentes();
-  const ind = useAtividadesIndicadores();
+
+  const filteredVinculadas = useMemo(() => {
+    return atividadesVinculadas.filter((a) => {
+      if (dataDe && a.data < dataDe) return false;
+      if (dataAte && a.data > dataAte) return false;
+      return true;
+    });
+  }, [atividadesVinculadas, dataDe, dataAte]);
+
+  const filteredIndependentes = useMemo(() => {
+    return atividadesIndependentes.filter((a) => {
+      if (dataDe && a.data < dataDe) return false;
+      if (dataAte && a.data > dataAte) return false;
+      return true;
+    });
+  }, [atividadesIndependentes, dataDe, dataAte]);
+
+  const ind = useMemo(() => {
+    const all = [...filteredVinculadas, ...filteredIndependentes];
+    return all.reduce(
+      (acc, a) => {
+        const i = a.indicadores;
+        if (!i) return acc;
+        acc.participantes += i.participantes ?? 0;
+        acc.mulheres += i.mulheres ?? 0;
+        acc.jovens += i.jovens ?? 0;
+        acc.quilombolas += i.quilombolas ?? 0;
+        acc.povosOriginarios += i.povosOriginarios ?? 0;
+        acc.comunidadesTradicionais += i.comunidadesTradicionais ?? 0;
+        acc.tecnologiasSociais += i.tecnologiasSociais ?? 0;
+        return acc;
+      },
+      {
+        participantes: 0,
+        mulheres: 0,
+        jovens: 0,
+        quilombolas: 0,
+        povosOriginarios: 0,
+        comunidadesTradicionais: 0,
+        tecnologiasSociais: 0,
+      }
+    );
+  }, [filteredVinculadas, filteredIndependentes]);
 
   // Geographic distribution: group activities by municipio
   const porMunicipio = useMemo(() => {
-    const allAtividades = [...atividadesVinculadas, ...atividadesIndependentes];
+    const allAtividades = [...filteredVinculadas, ...filteredIndependentes];
     const map: Record<string, number> = {};
     allAtividades.forEach((a) => {
       const mun = a.municipio?.trim() || "Não informado";
@@ -91,7 +145,7 @@ function IndicadoresPage() {
     const top4 = entries.slice(0, 4);
     const outros = entries.slice(4).reduce((acc, [, v]) => acc + v, 0);
     return [...top4.map(([name, value]) => ({ name, value })), { name: "Outros", value: outros }];
-  }, [atividadesVinculadas, atividadesIndependentes]);
+  }, [filteredVinculadas, filteredIndependentes]);
 
   // Beneficiarios bar chart: only real aggregated values from DB
   const beneficiarios = [
@@ -199,7 +253,41 @@ function IndicadoresPage() {
         </>
       }
     >
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="space-y-4">
+        {/* Card de Filtros: Período */}
+        <Card className="border border-muted/80 bg-card/60 backdrop-blur-md shadow-sm rounded-xl overflow-hidden">
+          <CardContent className="p-4 flex flex-wrap gap-4 items-center justify-between">
+            <div className="flex flex-wrap gap-3 items-center">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Período:</span>
+                <DatePicker
+                  value={dataDe}
+                  onChange={setDataDe}
+                  hasError={isPeriodInvalid}
+                />
+                <span className="text-xs text-muted-foreground">até</span>
+                <DatePicker
+                  value={dataAte}
+                  onChange={setDataAte}
+                  hasError={isPeriodInvalid}
+                />
+              </div>
+
+              {hasActiveFilters && (
+                <Button
+                  variant="ghost"
+                  onClick={clearFilters}
+                  className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
+                >
+                  <X className="h-3 w-3" />
+                  Limpar filtros
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader><CardTitle className="text-base">Beneficiários por Grupo</CardTitle></CardHeader>
           <CardContent className="h-80" ref={barRef}>
@@ -243,7 +331,7 @@ function IndicadoresPage() {
         </Card>
       </div>
 
-      <Card className="mt-4">
+      <Card className="mt-0">
         <CardHeader><CardTitle className="text-base">Resumo Consolidado</CardTitle></CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -258,6 +346,7 @@ function IndicadoresPage() {
           </div>
         </CardContent>
       </Card>
+      </div>
     </AppLayout>
   );
 }

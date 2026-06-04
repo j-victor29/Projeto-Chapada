@@ -24,6 +24,7 @@ export type Database = {
           photo_url: string | null
           role: string | null
           cargo: string | null
+          last_seen: string | null
         }
         Insert: {
           created_at?: string
@@ -34,6 +35,7 @@ export type Database = {
           photo_url?: string | null
           role?: string | null
           cargo?: string | null
+          last_seen?: string | null
         }
         Update: {
           created_at?: string
@@ -44,6 +46,7 @@ export type Database = {
           photo_url?: string | null
           role?: string | null
           cargo?: string | null
+          last_seen?: string | null
         }
         Relationships: []
       }

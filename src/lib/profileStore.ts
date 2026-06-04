@@ -6,7 +6,7 @@ export interface UserProfile {
   firstName: string;
   lastName: string;
   photoDataUrl?: string;
-  role?: "admin" | "editor" | "visualizador";
+  role?: "admin";
 }
 
 let profiles: Record<string, UserProfile> = {};
@@ -48,7 +48,7 @@ export const fetchProfile = async (email: string) => {
           firstName,
           lastName,
           photoDataUrl: data.photo_url || undefined,
-          role: (data.role as any) || "visualizador",
+          role: "admin",
         },
       };
       emit();
@@ -79,7 +79,7 @@ export const setProfile = async (email: string, data: Partial<UserProfile>) => {
         .update({
           full_name: fullNameVal,
           photo_url: updated.photoDataUrl || null,
-          role: updated.role || "visualizador",
+          role: "admin",
         })
         .eq("id", userProf.id);
 

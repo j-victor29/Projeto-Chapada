@@ -3,7 +3,6 @@ import { useMemo, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Table,
@@ -22,7 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { MessageSquare, RefreshCw, Send } from "lucide-react";
+import { Loader2, MessageSquare, RefreshCw, Send } from "lucide-react";
 import { useGlobalSearch } from "@/contexts/SearchContext";
 import { addNotification } from "@/lib/notificationsStore";
 import { useAuth } from "@/contexts/AuthContext";
@@ -30,36 +29,132 @@ import { useProfile, fullName } from "@/lib/profileStore";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserPresence, type UserStatus } from "@/hooks/useUserPresence";
 
 export const Route = createFileRoute("/usuarios")({
   component: UsuariosPage,
 });
 
+// ─── Tipos ────────────────────────────────────────────────────────────────────
 
 interface UsuarioRow {
   id: string;
   email: string;
   full_name: string | null;
   role: string | null;
+  cargo: string | null;
   updated_at: string | null;
+  last_seen: string | null;
 }
 
-const formatLastUpdate = (iso: string | null) => {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
+// ─── Utilitários ──────────────────────────────────────────────────────────────
+
+/**
+ * Formata o campo "Visto por último" com base no status e no last_seen.
+ * - Online/Inativo → "Agora"
+ * - Offline mesmo dia → "Hoje às HH:mm"
+ * - Dia anterior → "Ontem às HH:mm"
+ * - Mais antigo → "Há X dias" ou "DD/MM/AAAA"
+ */
+function formatLastSeen(lastSeen: string | null, status: UserStatus): string {
+  if (status === "online" || status === "inactive") return "Agora";
+  if (!lastSeen) return "—";
+
+  const date = new Date(lastSeen);
+  const now = new Date();
+
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfYesterday = new Date(startOfToday.getTime() - 86_400_000);
+  const diffDays = Math.floor(
+    (startOfToday.getTime() - date.getTime()) / 86_400_000
+  );
+
+  const timeStr = date.toLocaleTimeString("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
   });
-};
 
-const roleLabel: Record<string, string> = {
-  admin: "Admin",
-  editor: "Editor",
-  visualizador: "Visualizador",
-};
+  if (date >= startOfToday) {
+    return `Hoje às ${timeStr}`;
+  }
+  if (date >= startOfYesterday) {
+    return `Ontem às ${timeStr}`;
+  }
+  if (diffDays <= 30) {
+    return `Há ${diffDays} dia${diffDays !== 1 ? "s" : ""}`;
+  }
+  return date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+// ─── Componentes ──────────────────────────────────────────────────────────────
+
+/** Bolinha de status colorida */
+function StatusDot({ status }: { status: UserStatus }) {
+  const colorMap: Record<UserStatus, string> = {
+    online: "bg-green-500",
+    inactive: "bg-amber-500",
+    offline: "bg-slate-400",
+  };
+  return (
+    <span
+      className={`inline-block h-2.5 w-2.5 rounded-full ring-2 ring-background flex-shrink-0 ${colorMap[status]}`}
+      aria-hidden="true"
+    />
+  );
+}
+
+/** Badge de status textual com bolinha */
+function StatusBadge({ status }: { status: UserStatus }) {
+  const labelMap: Record<UserStatus, string> = {
+    online: "Online",
+    inactive: "Inativo",
+    offline: "Offline",
+  };
+  return (
+    <div className="flex items-center gap-2">
+      <StatusDot status={status} />
+      <span className="text-sm text-muted-foreground">{labelMap[status]}</span>
+    </div>
+  );
+}
+
+/** Avatar com bolinha de presença sobreposta no canto inferior direito */
+function PresenceAvatar({
+  initials,
+  status,
+}: {
+  initials: string;
+  status: UserStatus;
+}) {
+  return (
+    <div className="relative flex-shrink-0">
+      <Avatar className="h-9 w-9">
+        <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+          {initials}
+        </AvatarFallback>
+      </Avatar>
+      {/* Bolinha de status sobreposta */}
+      <span
+        className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-background"
+        style={{
+          backgroundColor:
+            status === "online"
+              ? "rgb(34 197 94)"       // green-500
+              : status === "inactive"
+              ? "rgb(245 158 11)"      // amber-500
+              : "rgb(148 163 184)",    // slate-400
+        }}
+        aria-hidden="true"
+      />
+    </div>
+  );
+}
+
+// ─── Página principal ─────────────────────────────────────────────────────────
 
 function UsuariosPage() {
   const { query } = useGlobalSearch();
@@ -69,8 +164,12 @@ function UsuariosPage() {
 
   const [recipient, setRecipient] = useState<UsuarioRow | null>(null);
   const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
 
-  // ── Fetch real profiles from Supabase ────────────────────────────────────
+  // ── Presença em tempo real ────────────────────────────────────────────────
+  const { getStatusOf } = useUserPresence();
+
+  // ── Fetch de perfis do Supabase ───────────────────────────────────────────
   const {
     data: usuarios = [],
     isLoading,
@@ -81,10 +180,10 @@ function UsuariosPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, email, full_name, role, updated_at")
+        .select("id, email, full_name, role, cargo, updated_at, last_seen")
         .order("full_name", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as any as UsuarioRow[];
+      return (data ?? []) as UsuarioRow[];
     },
     staleTime: 60_000,
   });
@@ -97,22 +196,45 @@ function UsuariosPage() {
     );
   }, [query, usuarios]);
 
-  const sendMessage = () => {
-    if (!recipient) return;
+  const sendMessage = async () => {
+    if (!recipient || !user?.id) return;
     const text = message.trim();
     if (!text) {
       toast.error("Digite uma mensagem.");
       return;
     }
-    addNotification({
-      type: "mensagem",
-      title: `📩 ${senderName} enviou uma mensagem`,
-      body: text.slice(0, 140),
-      from: senderName,
-    });
-    toast.success(`Mensagem enviada para ${recipient.full_name ?? recipient.email}.`);
-    setRecipient(null);
-    setMessage("");
+    setSending(true);
+    try {
+      const titulo = `Nova mensagem de ${senderName}`;
+      const { error } = await supabase.from("notificacoes").insert({
+        usuario_id: recipient.id,
+        remetente_id: user.id,
+        titulo,
+        mensagem: text,
+        tipo: "mensagem",
+        remetente: senderName,
+        lida: false,
+      });
+      if (error) throw error;
+
+      // Notifica o remetente localmente tb (echo local)
+      addNotification({
+        type: "mensagem",
+        title: `📩 Mensagem enviada para ${recipient.full_name ?? recipient.email}`,
+        body: text.slice(0, 140),
+        from: senderName,
+      });
+
+      toast.success(
+        `Mensagem enviada para ${recipient.full_name ?? recipient.email}.`
+      );
+      setRecipient(null);
+      setMessage("");
+    } catch (err: unknown) {
+      toast.error(`Erro ao enviar mensagem: ${(err as Error).message}`);
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -120,7 +242,12 @@ function UsuariosPage() {
       title="Controle de Usuários"
       subtitle="Equipe e contatos do sistema CHAPADA"
       actions={
-        <Button variant="outline" className="gap-2" onClick={() => refetch()} disabled={isLoading}>
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={() => refetch()}
+          disabled={isLoading}
+        >
           <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
           Atualizar
         </Button>
@@ -134,28 +261,38 @@ function UsuariosPage() {
                 <TableHead>Usuário</TableHead>
                 <TableHead>E-mail</TableHead>
                 <TableHead>Cargo</TableHead>
-                <TableHead>Última atualização</TableHead>
-                <TableHead>Papel</TableHead>
+                <TableHead>Visto por último</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-16 text-muted-foreground">
+                  <TableCell
+                    colSpan={6}
+                    className="text-center py-16 text-muted-foreground"
+                  >
                     <RefreshCw className="h-6 w-6 mx-auto mb-2 animate-spin" />
                     Carregando usuários...
                   </TableCell>
                 </TableRow>
               ) : isError ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-16 text-destructive">
-                    Erro ao carregar usuários. Verifique as permissões de RLS na tabela profiles.
+                  <TableCell
+                    colSpan={6}
+                    className="text-center py-16 text-destructive"
+                  >
+                    Erro ao carregar usuários. Verifique as permissões de RLS na
+                    tabela profiles.
                   </TableCell>
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">
+                  <TableCell
+                    colSpan={6}
+                    className="text-center text-sm text-muted-foreground py-8"
+                  >
                     Nenhum usuário encontrado.
                   </TableCell>
                 </TableRow>
@@ -168,30 +305,39 @@ function UsuariosPage() {
                     .slice(0, 2)
                     .join("")
                     .toUpperCase();
+                  const status = getStatusOf(u.id);
+
                   return (
                     <TableRow key={u.id}>
+                      {/* Coluna: Usuário com avatar + bolinha de presença */}
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-9 w-9">
-                            <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                              {initials}
-                            </AvatarFallback>
-                          </Avatar>
+                          <PresenceAvatar initials={initials} status={status} />
                           <span className="font-medium">{displayName}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
+
+                      {/* Coluna: E-mail */}
                       <TableCell className="text-sm text-muted-foreground">
-                        <span className="italic text-muted-foreground/60">—</span>
+                        {u.email}
                       </TableCell>
+
+                      {/* Coluna: Cargo — exibe "Administrador" por padrão */}
+                      <TableCell className="text-sm text-muted-foreground">
+                        {u.cargo ?? "Administrador"}
+                      </TableCell>
+
+                      {/* Coluna: Visto por último */}
                       <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                        {formatLastUpdate(u.updated_at)}
+                        {formatLastSeen(u.last_seen, status)}
                       </TableCell>
+
+                      {/* Coluna: Status em tempo real */}
                       <TableCell>
-                        <Badge variant="outline" className="capitalize">
-                          {roleLabel[u.role ?? ""] ?? u.role ?? "—"}
-                        </Badge>
+                        <StatusBadge status={status} />
                       </TableCell>
+
+                      {/* Coluna: Ações */}
                       <TableCell className="text-right">
                         <Button
                           size="sm"
@@ -214,14 +360,20 @@ function UsuariosPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={!!recipient} onOpenChange={(o) => !o && setRecipient(null)}>
+      {/* Dialog de envio de mensagem */}
+      <Dialog
+        open={!!recipient}
+        onOpenChange={(o) => !o && setRecipient(null)}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Enviar mensagem</DialogTitle>
             <DialogDescription>
               Para: <strong>{recipient?.full_name ?? recipient?.email}</strong>
               <br />
-              <span className="text-xs text-muted-foreground">{recipient?.email}</span>
+              <span className="text-xs text-muted-foreground">
+                {recipient?.email}
+              </span>
             </DialogDescription>
           </DialogHeader>
           <Textarea
@@ -231,13 +383,23 @@ function UsuariosPage() {
             rows={5}
             maxLength={500}
           />
-          <p className="text-[11px] text-muted-foreground text-right">{message.length}/500</p>
+          <p className="text-[11px] text-muted-foreground text-right">
+            {message.length}/500
+          </p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRecipient(null)}>
               Cancelar
             </Button>
-            <Button onClick={sendMessage} className="gap-2">
-              <Send className="h-4 w-4" /> Enviar
+            <Button onClick={sendMessage} className="gap-2" disabled={sending}>
+              {sending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> Enviando...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4" /> Enviar
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

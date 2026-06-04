@@ -31,6 +31,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Select,
   SelectContent,
@@ -79,6 +80,8 @@ export default function Dashboard() {
       selCategoria !== "todos"
     );
   }, [dataDe, dataAte, selProjeto, selFinanciador, selMunicipio, selStatus, selCategoria]);
+
+  const isPeriodInvalid = !!(dataDe && dataAte && dataDe > dataAte);
 
   const clearFilters = () => {
     setDataDe("");
@@ -338,18 +341,16 @@ export default function Dashboard() {
           <div className="flex flex-wrap gap-3 items-center">
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Período:</span>
-              <Input
-                type="date"
+              <DatePicker
                 value={dataDe}
-                onChange={(e) => setDataDe(e.target.value)}
-                className="h-9 w-36 text-xs"
+                onChange={setDataDe}
+                hasError={isPeriodInvalid}
               />
               <span className="text-xs text-muted-foreground">até</span>
-              <Input
-                type="date"
+              <DatePicker
                 value={dataAte}
-                onChange={(e) => setDataAte(e.target.value)}
-                className="h-9 w-36 text-xs"
+                onChange={setDataAte}
+                hasError={isPeriodInvalid}
               />
             </div>
 

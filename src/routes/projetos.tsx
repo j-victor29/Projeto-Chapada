@@ -98,10 +98,10 @@ export const Route = createFileRoute("/projetos")({
 const STATUS: ProjetoStatus[] = ["Planejamento", "Em execução", "Concluído", "Suspenso"];
 
 const statusVariant: Record<ProjetoStatus, string> = {
-  Planejamento: "bg-ocre/20 text-ocre-foreground border-ocre/30",
+  Planejamento: "bg-terracotta/15 text-terracotta border-terracotta/30",
   "Em execução": "bg-savanna/15 text-savanna border-savanna/30",
   Concluído: "bg-primary/10 text-primary border-primary/30",
-  Suspenso: "bg-terracotta/15 text-terracotta border-terracotta/30",
+  Suspenso: "bg-destructive/15 text-destructive border-destructive/30",
 };
 
 const emptyProjeto: Omit<ProjetoDB, "id"> = {
