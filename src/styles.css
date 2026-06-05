@@ -134,49 +134,46 @@
 }
 
 .dark {
-  /* Fundo principal — azul escuro */
-  --background: oklch(0.25 0.04 230);
-  --foreground: oklch(1 0 0);
-  
-  /* Cards e superfícies — azul médio (baseado no foreground do claro) */
-  --card: oklch(0.32 0.04 230);
-  --card-foreground: oklch(1 0 0);
-  
-  --popover: oklch(0.32 0.04 230);
-  --popover-foreground: oklch(1 0 0);
+  /* Fundo principal — azul muito escuro (navy profundo) */
+  --background: oklch(0.20 0.04 232);
+  --foreground: oklch(0.97 0.005 235);
 
-  /* A cor primária (azul) se mantém, para preservar a identidade visual */
+  /* Cards — um tom acima do fundo para criar profundidade */
+  --card: oklch(0.27 0.05 232);
+  --card-foreground: oklch(0.97 0.005 235);
+
+  --popover: oklch(0.27 0.05 232);
+  --popover-foreground: oklch(0.97 0.005 235);
+
+  /* Primário mantém o azul CHAPADA vibrante como acento */
   --primary: oklch(0.66 0.13 232);
   --primary-foreground: oklch(1 0 0);
-  --primary-glow: oklch(0.70 0.13 232);
+  --primary-glow: oklch(0.72 0.13 232);
 
-  /* Elementos secundários */
-  --secondary: oklch(0.38 0.04 230);
-  --secondary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.32 0.05 232);
+  --secondary-foreground: oklch(0.97 0.005 235);
 
-  /* Elementos mutados (texto secundário, fundos de badges neutros) */
-  --muted: oklch(0.35 0.04 230);
-  --muted-foreground: oklch(0.85 0.02 230);
+  /* Textos secundários legíveis */
+  --muted: oklch(0.30 0.04 232);
+  --muted-foreground: oklch(0.78 0.025 235);
 
-  --accent: oklch(0.38 0.04 230);
-  --accent-foreground: oklch(1 0 0);
+  --accent: oklch(0.32 0.05 232);
+  --accent-foreground: oklch(0.97 0.005 235);
 
-  /* Cores de status e destaque mantidas ou levemente ajustadas para legibilidade no escuro */
+  /* Cores de status mantidas */
   --terracotta: oklch(0.76 0.16 75);
   --terracotta-foreground: oklch(0.15 0.02 60);
-  
   --ocre: oklch(0.76 0.16 75);
   --ocre-foreground: oklch(0.15 0.02 60);
-  
   --savanna: oklch(0.66 0.16 145);
   --savanna-foreground: oklch(1 0 0);
-  
-  --destructive: oklch(0.60 0.20 28);
+
+  --destructive: oklch(0.62 0.20 28);
   --destructive-foreground: oklch(1 0 0);
 
-  /* Bordas e inputs */
-  --border: oklch(0.40 0.04 230);
-  --input: oklch(0.40 0.04 230);
+  /* Bordas sutis para separar elementos */
+  --border: oklch(0.35 0.05 232);
+  --input: oklch(0.32 0.05 232);
   --ring: oklch(0.66 0.13 232);
 
   /* Gráficos */
@@ -186,15 +183,15 @@
   --chart-4: oklch(0.54 0.12 232);
   --chart-5: oklch(0.78 0.09 232);
 
-  /* Sidebar no modo escuro */
-  --sidebar: oklch(0.25 0.04 230);
+  /* SIDEBAR — azul CHAPADA original (identidade da marca) */
+  --sidebar: oklch(0.66 0.13 232);
   --sidebar-foreground: oklch(1 0 0);
-  --sidebar-primary: oklch(0.66 0.13 232);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.32 0.04 230);
+  --sidebar-primary: oklch(0.76 0.16 75);
+  --sidebar-primary-foreground: oklch(0.25 0.04 60);
+  --sidebar-accent: oklch(0.54 0.12 232);
   --sidebar-accent-foreground: oklch(1 0 0);
-  --sidebar-border: oklch(0.32 0.04 230);
-  --sidebar-ring: oklch(0.66 0.13 232);
+  --sidebar-border: oklch(0.54 0.12 232);
+  --sidebar-ring: oklch(0.76 0.16 75);
 }
 
 @layer base {
