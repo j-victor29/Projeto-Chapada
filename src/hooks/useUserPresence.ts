@@ -42,6 +42,10 @@ export function useUserPresence(): UseUserPresenceReturn {
 
   // ─── Nome do usuário atual ───────────────────────────────────────────────
   const currentName = fullName(profile, user?.email?.split("@")[0] ?? "Usuário");
+  const currentNameRef = useRef(currentName);
+  useEffect(() => {
+    currentNameRef.current = currentName;
+  }, [currentName]);
 
   // ─── Atualiza last_seen no banco ────────────────────────────────────────
   const updateLastSeen = useCallback(async () => {
@@ -59,11 +63,11 @@ export function useUserPresence(): UseUserPresenceReturn {
       currentStatusRef.current = status;
       await channelRef.current.track({
         id: user.id,
-        nome: currentName,
+        nome: currentNameRef.current,
         status,
       } satisfies PresenceUser);
     },
-    [user?.id, currentName]
+    [user?.id]
   );
 
   // ─── Idle Detector ───────────────────────────────────────────────────────
@@ -93,9 +97,10 @@ export function useUserPresence(): UseUserPresenceReturn {
     // Listener de estado Presence: sincroniza lista de usuários online
     channel.on("presence", { event: "sync" }, () => {
       const state = channel.presenceState<PresenceUser>();
-      const users: PresenceUser[] = Object.values(state).flatMap(
-        (presences) => presences
-      );
+      // Deduplicação: pega apenas a primeira instância de presença para cada key (user_id)
+      const users: PresenceUser[] = Object.values(state)
+        .map((presences) => presences[0])
+        .filter(Boolean);
       setOnlineUsers(users);
     });
 
