@@ -209,6 +209,12 @@ export const deleteAtividade = async (id: string) => {
   emitIndependentes();
 };
 
+export const refreshAtividades = async () => {
+  initialized = false;
+  initializedIndependentes = false;
+  await Promise.all([initAtividades(), initAtividadesIndependentes()]);
+};
+
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 
 export const useAtividades = (): AtividadeFull[] => {

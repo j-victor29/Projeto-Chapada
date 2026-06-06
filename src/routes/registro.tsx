@@ -47,7 +47,7 @@ function RegistroPage() {
     if (!canCreate) return;
     setSubmitting(true);
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password: pwd,
         options: {
@@ -61,10 +61,23 @@ function RegistroPage() {
         toast.error(error.message);
         return;
       }
+      
+      // Clear automatic session from signUp to prevent auto-login redirect
+      await supabase.auth.signOut();
+
       if (typeof window !== "undefined") {
-        sessionStorage.setItem("chapada.flash", "registered");
+        localStorage.removeItem("sb-access-token");
+        localStorage.removeItem("sb-refresh-token");
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith("sb-")) {
+            localStorage.removeItem(key);
+          }
+        }
       }
-      setStep("done");
+
+      toast.success("Conta criada com sucesso! Faça login para continuar.");
+      navigate({ to: "/login" });
     } catch (err) {
       console.error("createAccount error", err);
       toast.error("Não foi possível criar sua conta. Tente novamente.");

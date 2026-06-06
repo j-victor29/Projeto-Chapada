@@ -21,7 +21,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, MessageSquare, RefreshCw, Send } from "lucide-react";
+import { Loader2, MessageSquare, RefreshCw, Send, Pencil } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useGlobalSearch } from "@/contexts/SearchContext";
 import { addNotification } from "@/lib/notificationsStore";
 import { useAuth } from "@/contexts/AuthContext";
@@ -166,6 +175,13 @@ function UsuariosPage() {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
 
+  // States for user profile editing
+  const [editingUsuario, setEditingUsuario] = useState<UsuarioRow | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editCargo, setEditCargo] = useState("");
+  const [editRole, setEditRole] = useState("admin");
+  const [savingUsuario, setSavingUsuario] = useState(false);
+
   // ── Presença em tempo real ────────────────────────────────────────────────
   const { getStatusOf } = useUserPresence();
 
@@ -234,6 +250,35 @@ function UsuariosPage() {
       toast.error(`Erro ao enviar mensagem: ${(err as Error).message}`);
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleSaveUsuario = async () => {
+    if (!editingUsuario) return;
+    if (!editName.trim()) {
+      toast.error("O nome do usuário não pode ficar em branco.");
+      return;
+    }
+    setSavingUsuario(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          full_name: editName.trim(),
+          cargo: editCargo.trim() || null,
+          role: editRole,
+        })
+        .eq("id", editingUsuario.id);
+
+      if (error) throw error;
+
+      toast.success("Usuário atualizado com sucesso!");
+      refetch();
+      setEditingUsuario(null);
+    } catch (err: unknown) {
+      toast.error(`Erro ao atualizar usuário: ${(err as Error).message}`);
+    } finally {
+      setSavingUsuario(false);
     }
   };
 
@@ -339,17 +384,32 @@ function UsuariosPage() {
 
                       {/* Coluna: Ações */}
                       <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-2"
-                          onClick={() => {
-                            setRecipient(u);
-                            setMessage("");
-                          }}
-                        >
-                          <MessageSquare className="h-4 w-4" /> Enviar mensagem
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-2"
+                            onClick={() => {
+                              setEditingUsuario(u);
+                              setEditName(u.full_name ?? "");
+                              setEditCargo(u.cargo ?? "");
+                              setEditRole(u.role ?? "admin");
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" /> Editar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-2"
+                            onClick={() => {
+                              setRecipient(u);
+                              setMessage("");
+                            }}
+                          >
+                            <MessageSquare className="h-4 w-4" /> Enviar mensagem
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -398,6 +458,69 @@ function UsuariosPage() {
               ) : (
                 <>
                   <Send className="h-4 w-4" /> Enviar
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de edição de usuário */}
+      <Dialog
+        open={!!editingUsuario}
+        onOpenChange={(o) => !o && setEditingUsuario(null)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Usuário</DialogTitle>
+            <DialogDescription>
+              Atualize as informações de cadastro e perfil de <strong>{editingUsuario?.email}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-name">Nome Completo</Label>
+              <Input
+                id="edit-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Nome completo do usuário"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-cargo">Cargo</Label>
+              <Input
+                id="edit-cargo"
+                value={editCargo}
+                onChange={(e) => setEditCargo(e.target.value)}
+                placeholder="Ex: Assessor Pedagógico, Agrônomo"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-role">Papel / Acesso</Label>
+              <Select value={editRole} onValueChange={setEditRole}>
+                <SelectTrigger id="edit-role">
+                  <SelectValue placeholder="Selecione o papel" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Administrador (Acesso total)</SelectItem>
+                  <SelectItem value="tecnico">Técnico (Equipe em Campo)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingUsuario(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveUsuario} className="gap-2" disabled={savingUsuario}>
+              {savingUsuario ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> Salvando...
+                </>
+              ) : (
+                <>
+                  Salvar
                 </>
               )}
             </Button>

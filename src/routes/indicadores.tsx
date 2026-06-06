@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useRef, useMemo, useState } from "react";
+import { useRef, useMemo, useState, useEffect } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileDown, FileSpreadsheet, X } from "lucide-react";
+import { FileDown, FileSpreadsheet, X, RefreshCw } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
   ResponsiveContainer,
@@ -22,7 +22,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
-import { useAtividades, useAtividadesIndicadores, useAtividadesIndependentes } from "@/lib/atividadesStore";
+import { useAtividades, useAtividadesIndicadores, useAtividadesIndependentes, refreshAtividades } from "@/lib/atividadesStore";
 
 export const Route = createFileRoute("/indicadores")({
   component: IndicadoresPage,
@@ -65,6 +65,25 @@ async function chartToPng(node: HTMLElement | null): Promise<string | null> {
 function IndicadoresPage() {
   const barRef = useRef<HTMLDivElement>(null);
   const pieRef = useRef<HTMLDivElement>(null);
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    refreshAtividades();
+  }, []);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refreshAtividades();
+      toast.success("Indicadores atualizados com sucesso.");
+    } catch (e) {
+      console.error(e);
+      toast.error("Falha ao atualizar indicadores.");
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // Filtros
   const [dataDe, setDataDe] = useState("");

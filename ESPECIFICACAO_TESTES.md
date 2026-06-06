@@ -104,7 +104,7 @@ Adotamos a **Pirâmide de Testes** adaptada ao contexto SPA + BaaS:
 | Perfil | E-mail | Senha | Role |
 |--------|--------|-------|------|
 | **Administrador** | `admin@ongchapada.org.br` | `chapada2026` | `admin` (`is_admin: true`) |
-| **Técnico** | `tecnico@ongchapada.org.br` | `chapada2026` | `tecnico` (`is_admin: false`) |
+| **Técnico / Colaborador** | `tecnico@ongchapada.org.br` | `chapada2026` | `admin` (`is_admin: true`) |
 
 ---
 
@@ -184,9 +184,8 @@ Testes de renderização, interação e estado visual dos componentes.
 
 | ID | Cenário | Condição | Resultado Esperado |
 |----|---------|----------|--------------------|
-| CT-004 | Renderiza todos os itens de menu (técnico) | `role=tecnico` | 9 itens visíveis (sem Usuários e Auditoria) |
-| CT-005 | Renderiza item Usuários para admin | `role=admin` | 10 itens visíveis (inclui Usuários) |
-| CT-006 | Auditoria nunca aparece no menu | `role=admin` | Item "Auditoria" ausente |
+| CT-004 | Renderiza todos os itens de menu | Qualquer usuário logado | Todos os 10 itens visíveis (inclui Usuários) |
+| CT-005 | Auditoria nunca aparece no menu | Qualquer usuário logado | Item "Auditoria" ausente |
 | CT-007 | Item ativo recebe destaque visual | URL = `/projetos` | Item "Projetos" com classe `bg-sidebar-primary` |
 | CT-008 | Logo CHAPADA renderiza corretamente | Mount | Imagem `chapada-logo.png` presente |
 
@@ -248,7 +247,7 @@ Testes que validam a comunicação entre componentes React e os stores/hooks que
 | IT-002 | Cria novo projeto | Mutation com dados válidos | Projeto inserido, cache invalidado |
 | IT-003 | Atualiza projeto existente | Mutation de update | Dados atualizados, toast de sucesso |
 | IT-004 | Exclui projeto (admin) | Mutation de delete | Projeto removido do banco |
-| IT-005 | Exclui projeto (técnico) — deve falhar | Mutation de delete | Erro RLS, toast de erro |
+| IT-005 | Exclui projeto por qualquer usuário | Mutation de delete | Projeto removido do banco, RLS permite para todos |
 
 #### 📁 `src/lib/atividadesStore.ts`
 
@@ -341,7 +340,7 @@ Fluxos completos de ponta a ponta no navegador real via **Playwright**.
 | E2E-013 | Visualizar detalhes do projeto | 1. Clica em um projeto | Detalhes do projeto exibidos (contrato, financiador, datas, valor) |
 | E2E-014 | Editar projeto | 1. Abre projeto → 2. Clica "Editar" → 3. Altera nome → 4. Salva | Nome atualizado na listagem |
 | E2E-015 | Excluir projeto (admin) | 1. Login admin → 2. Abre projeto → 3. "Excluir" → 4. Confirma | Projeto removido da listagem |
-| E2E-016 | Excluir projeto (técnico) — negado | 1. Login técnico → 2. Tenta excluir | Erro exibido (RLS impede) |
+| E2E-016 | Exclui projeto por usuário técnico | 1. Login técnico → 2. Tenta excluir | Projeto excluído com sucesso (todos são admin) |
 | E2E-017 | Vincular tecnologias ao projeto | 1. Cria/edita projeto → 2. Adiciona tecnologia na pivot | Tecnologia listada no projeto |
 | E2E-018 | Filtrar projetos por status | 1. `/projetos` → 2. Filtra "Em execução" | Apenas projetos ativos |
 | E2E-019 | Exportar projetos (PDF/Excel) | 1. Clica botão exportar | Arquivo baixado com dados |
@@ -410,7 +409,7 @@ Fluxos completos de ponta a ponta no navegador real via **Playwright**.
 |----|---------|--------|--------------------|
 | E2E-043 | Admin visualiza lista de usuários | 1. Login admin → 2. `/usuarios` | Lista de todos os perfis |
 | E2E-044 | Admin altera role de usuário | 1. Seleciona usuário → 2. Altera role → 3. Salva | Role atualizado |
-| E2E-045 | Técnico não acessa `/usuarios` | 1. Login técnico → 2. Navega `/usuarios` | Redireciona ou mostra acesso negado |
+| E2E-045 | Técnico acessa `/usuarios` | 1. Login técnico → 2. Navega `/usuarios` | Lista de usuários carregada com sucesso (todos são admin) |
 
 #### 🔒 Fluxo de Auditoria
 
@@ -511,35 +510,32 @@ Validação das políticas de segurança em nível de linha.
 
 #### Matriz de Permissões
 
-| Tabela | SELECT (auth) | INSERT (auth) | UPDATE (auth) | DELETE (admin) | DELETE (técnico) |
-|--------|:---:|:---:|:---:|:---:|:---:|
-| `profiles` | ✅ todos | ✅ próprio | ✅ próprio | ✅ | ❌ |
-| `linhas_de_acao` | ✅ | ✅ admin | ✅ admin | ✅ admin | ❌ |
-| `tecnologias_sociais` | ✅ | ✅ | ✅ | ✅ | ❌ |
-| `projetos` | ✅ | ✅ | ✅ | ✅ | ❌ |
-| `projeto_tecnologias` | ✅ | ✅ | ✅ | ✅ | ❌ |
-| `beneficiarios` | ✅ | ✅ | ✅ | ✅ | ❌ |
-| `atividades` | ✅ | ✅ | ✅ | ✅ | ❌ |
-| `atividade_beneficiarios` | ✅ | ✅ | ✅ | ✅ | ❌ |
-| `atividade_tecnologias` | ✅ | ✅ | ✅ | ✅ | ❌ |
-| `arquivos_midia` | ✅ | ✅ | ✅ | ✅ | ❌ |
-| `auditoria` | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Tabela | SELECT (auth) | INSERT (auth) | UPDATE (auth) | DELETE (auth) |
+|--------|:---:|:---:|:---:|:---:|
+| `profiles` | ✅ todos | ✅ todos | ✅ todos | ✅ todos |
+| `linhas_de_acao` | ✅ | ✅ | ✅ | ✅ |
+| `tecnologias_sociais` | ✅ | ✅ | ✅ | ✅ |
+| `projetos` | ✅ | ✅ | ✅ | ✅ |
+| `projeto_tecnologias` | ✅ | ✅ | ✅ | ✅ |
+| `beneficiarios` | ✅ | ✅ | ✅ | ✅ |
+| `atividades` | ✅ | ✅ | ✅ | ✅ |
+| `atividade_beneficiarios` | ✅ | ✅ | ✅ | ✅ |
+| `atividade_tecnologias` | ✅ | ✅ | ✅ | ✅ |
+| `arquivos_midia` | ✅ | ✅ | ✅ | ✅ |
+| `auditoria` | ✅ | ✅ | ✅ | ✅ |
 
 #### Cenários de Teste RLS
 
 | ID | Cenário | Contexto | SQL / Ação | Resultado Esperado |
 |----|---------|----------|-----------|-------------------|
 | RLS-001 | Anon não lê projetos | Sem JWT | `SELECT * FROM projetos` | ❌ 0 linhas |
-| RLS-002 | Técnico lê todos os projetos | JWT técnico | `SELECT * FROM projetos` | ✅ Todos os projetos |
-| RLS-003 | Técnico cria projeto | JWT técnico | `INSERT INTO projetos ...` | ✅ Inserido |
-| RLS-004 | Técnico edita projeto | JWT técnico | `UPDATE projetos SET ...` | ✅ Atualizado |
-| RLS-005 | Técnico exclui projeto | JWT técnico | `DELETE FROM projetos ...` | ❌ RLS violation |
-| RLS-006 | Admin exclui projeto | JWT admin | `DELETE FROM projetos ...` | ✅ Excluído |
-| RLS-007 | Técnico edita perfil de outro | JWT técnico | `UPDATE profiles SET ... WHERE id != auth.uid()` | ❌ 0 rows affected |
-| RLS-008 | Técnico edita próprio perfil | JWT técnico | `UPDATE profiles SET ... WHERE id = auth.uid()` | ✅ Atualizado |
-| RLS-009 | Admin exclui perfil de outro | JWT admin | `DELETE FROM profiles WHERE id = 'outro'` | ✅ Excluído |
-| RLS-010 | Técnico altera linhas de ação | JWT técnico | `INSERT INTO linhas_de_acao ...` | ❌ RLS violation |
-| RLS-011 | Admin cria linha de ação | JWT admin | `INSERT INTO linhas_de_acao ...` | ✅ Inserido |
+| RLS-002 | Todos os autenticados leem projetos | JWT auth | `SELECT * FROM projetos` | ✅ Todos os projetos |
+| RLS-003 | Qualquer usuário autenticado cria projeto | JWT auth | `INSERT INTO projetos ...` | ✅ Inserido |
+| RLS-004 | Qualquer usuário autenticado edita projeto | JWT auth | `UPDATE projetos SET ...` | ✅ Atualizado |
+| RLS-005 | Qualquer usuário autenticado exclui projeto | JWT auth | `DELETE FROM projetos ...` | ✅ Excluído |
+| RLS-007 | Usuário edita perfil | JWT auth | `UPDATE profiles SET ...` | ✅ Atualizado |
+| RLS-008 | Usuário exclui perfil | JWT auth | `DELETE FROM profiles ...` | ✅ Excluído |
+| RLS-009 | Qualquer usuário cria linha de ação | JWT auth | `INSERT INTO linhas_de_acao ...` | ✅ Inserido |
 
 ---
 
@@ -553,7 +549,7 @@ Validação das políticas de segurança em nível de linha.
 | AUTH-004 | Registro de novo usuário | `supabase.auth.signUp()` | Usuário criado em `auth.users` |
 | AUTH-005 | Trigger `handle_new_user` dispara | Após `signUp()` | Perfil criado em `profiles` automaticamente |
 | AUTH-006 | `full_name` extraído de metadata | `signUp()` com `raw_user_meta_data.full_name` | `profiles.full_name` preenchido |
-| AUTH-007 | `is_admin` default false para novos | `signUp()` sem flag admin | `profiles.is_admin = false` |
+| AUTH-007 | `is_admin` default true para todos | `signUp()` | `profiles.is_admin = true` |
 | AUTH-008 | Reset de senha via email | `supabase.auth.resetPasswordForEmail()` | Email enviado (verificar logs Supabase) |
 | AUTH-009 | Atualizar senha | `supabase.auth.updateUser({ password })` | Senha alterada com sucesso |
 | AUTH-010 | Sessão persiste após reload | Login → Reload página | `getSession()` retorna sessão válida |
@@ -570,10 +566,9 @@ Validação das políticas de segurança em nível de linha.
 | STG-002 | Upload de documento por autenticado | `documentos` | JWT válido | ✅ Arquivo criado |
 | STG-003 | Upload por anônimo | `imagens` | Sem JWT | ❌ Unauthorized |
 | STG-004 | Leitura pública de objeto | `imagens` | JWT válido | ✅ URL acessível |
-| STG-005 | Delete por admin | `imagens` | JWT admin | ✅ Arquivo excluído |
-| STG-006 | Delete por técnico | `imagens` | JWT técnico | ❌ Policy violation |
-| STG-007 | Upload em bucket não autorizado | `outro_bucket` | JWT válido | ❌ Policy violation |
-| STG-008 | Upload com tipo de arquivo válido | `imagens` | JPG/PNG/WebP | ✅ Aceito |
+| STG-005 | Delete por qualquer autenticado | `imagens` | JWT auth | ✅ Arquivo excluído |
+| STG-006 | Upload em bucket não autorizado | `outro_bucket` | JWT válido | ❌ Policy violation |
+| STG-007 | Upload com tipo de arquivo válido | `imagens` | JPG/PNG/WebP | ✅ Aceito |
 
 ---
 
@@ -584,7 +579,7 @@ Validação das políticas de segurança em nível de linha.
 | AUD-001 | INSERT gera log | `projetos` | INSERT | Registro em `auditoria` com `acao='INSERT'`, `detalhes=to_jsonb(NEW)` |
 | AUD-002 | UPDATE gera log com diff | `projetos` | UPDATE | Registro com `detalhes={old: ..., new: ...}` |
 | AUD-003 | DELETE gera log | `projetos` | DELETE | Registro com `acao='DELETE'`, `detalhes=to_jsonb(OLD)` |
-| AUD-004 | Auditoria registra `usuario_id` | qualquer | INSERT/UPDATE/DELETE | `usuario_id = auth.uid()` (ou NULL se SECURITY DEFINER) |
+| AUD-004 | Auditoria registra `usuario_id` | qualquer | INSERT/UPDATE/DELETE | `usuario_id = auth.uid()` |
 | AUD-005 | Trigger ativo em `tecnologias_sociais` | `tecnologias_sociais` | INSERT | Registro de auditoria criado |
 | AUD-006 | Trigger ativo em `beneficiarios` | `beneficiarios` | UPDATE | Registro de auditoria criado |
 | AUD-007 | Trigger ativo em `atividades` | `atividades` | DELETE | Registro de auditoria criado |
@@ -611,18 +606,16 @@ Validação das políticas de segurança em nível de linha.
 #### TC-LOGIN-001: Login com sucesso (Admin)
 
 ```
-Pré-condição: Usuário admin@ongchapada.org.br existe no sistema
+Pré-condição: Usuário cadastrado no sistema
 Passos:
   1. Acessar /login
-  2. Informar email: admin@ongchapada.org.br
-  3. Informar senha: chapada2026
-  4. Marcar "Lembrar a senha"
-  5. Clicar "Entrar"
+  2. Informar email/senha
+  3. Clicar "Entrar"
 Resultado Esperado:
   - Toast "Bem-vindo de volta!" exibido
   - Redirecionamento para Dashboard (/)
   - Sidebar exibe todos os itens incluindo "Usuários"
-  - Avatar do admin visível no header
+  - Avatar do usuário visível no header
 Pós-condição: Sessão ativa no localStorage
 ```
 
@@ -632,7 +625,7 @@ Pós-condição: Sessão ativa no localStorage
 Pré-condição: Nenhuma sessão ativa
 Passos:
   1. Acessar /login
-  2. Informar email: admin@ongchapada.org.br
+  2. Informar email: email@ongchapada.org.br
   3. Informar senha: senha_errada
   4. Clicar "Entrar"
 Resultado Esperado:
@@ -660,7 +653,7 @@ Resultado Esperado:
 #### TC-DASH-001: Carregamento de métricas
 
 ```
-Pré-condição: Login admin, pelo menos 1 projeto e 1 atividade no banco
+Pré-condição: Login usuário, pelo menos 1 projeto e 1 atividade no banco
 Passos:
   1. Acessar Dashboard (/)
   2. Aguardar carregamento completo
@@ -679,7 +672,7 @@ Resultado Esperado:
 #### TC-PROJ-001: CRUD completo de projeto
 
 ```
-Pré-condição: Login admin
+Pré-condição: Login usuário
 Passos:
   CREATE:
     1. Navegar para /projetos
@@ -713,7 +706,7 @@ Resultado Esperado:
 #### TC-ATIV-001: Criar atividade com vínculos
 
 ```
-Pré-condição: Login admin, pelo menos 1 projeto e 1 beneficiário existem
+Pré-condição: Login usuário, pelo menos 1 projeto e 1 beneficiário existem
 Passos:
   1. Navegar para /atividades
   2. Clicar "Nova Atividade"
@@ -848,14 +841,11 @@ Resultado Esperado:
 
 #### TC-USR-001: Controle de acesso por role
 
-```
-Pré-condição: Login como técnico
+Pré-condição: Login como qualquer usuário cadastrado
 Passos:
   1. Navegar para /usuarios
 Resultado Esperado:
-  - Rota inacessível ou conteúdo bloqueado
-  - Redirecionamento ou mensagem de acesso negado
-```
+  - Rota acessível e lista de usuários carregada com sucesso (todos são admin)
 
 ---
 

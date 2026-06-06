@@ -14,7 +14,10 @@ import {
   Filter,
   X,
   AlertTriangle,
+  ClipboardList,
 } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useUserPresence } from "@/hooks/useUserPresence";
 import {
   ResponsiveContainer,
   BarChart,
@@ -53,6 +56,7 @@ const toneClass: Record<string, string> = {
 };
 
 export default function Dashboard() {
+  const { onlineUsers } = useUserPresence();
   const projetos = useProjetos();
   const tecnologias = useTecnologias();
   const atividadesVinculadas = useAtividades();
@@ -321,6 +325,7 @@ export default function Dashboard() {
 
   const kpiCards = [
     { label: "Projetos Ativos", value: filteredProjetos.filter(p => p.status === "Em execução").length, icon: FolderKanban, tone: "primary" },
+    { label: "Atividades", value: filteredAtividades.length, icon: ClipboardList, tone: "primary" },
     { label: "Famílias Atendidas", value: ind.participantes, icon: Users, tone: "savanna" },
     { label: "Mulheres Beneficiadas", value: ind.mulheres, icon: Heart, tone: "terracotta" },
     { label: "Jovens Atendidos", value: ind.jovens, icon: GraduationCap, tone: "ocre" },
@@ -459,6 +464,47 @@ export default function Dashboard() {
               <X className="h-3.5 w-3.5" /> Limpar filtros
             </Button>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Widget Colaboradores Online */}
+      <Card className="mb-6 border-border/50 bg-card/60 backdrop-blur-sm">
+        <CardContent className="p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold text-foreground">Online agora:</span>
+            <div className="flex -space-x-2 overflow-hidden">
+              {onlineUsers.map((u) => {
+                const displayName = u.nome || "Usuário";
+                const initials = displayName
+                  .split(" ")
+                  .map((n) => n[0])
+                  .slice(0, 2)
+                  .join("")
+                  .toUpperCase();
+                return (
+                  <div key={u.id} className="relative group">
+                    <Avatar className="h-8 w-8 ring-2 ring-background border border-border">
+                      <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
+                        {initials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span
+                      className={`absolute bottom-0 right-0 block h-2 w-2 rounded-full ring-1 ring-background ${
+                        u.status === "online" ? "bg-green-500" : "bg-amber-500"
+                      }`}
+                      aria-hidden="true"
+                    />
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-[10px] font-medium text-white bg-black/80 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                      {displayName} ({u.status === "online" ? "Online" : "Inativo"})
+                    </span>
+                  </div>
+                );
+              })}
+              {onlineUsers.length === 0 && (
+                <span className="text-xs text-muted-foreground italic">Nenhum colaborador online</span>
+              )}
+            </div>
+          </div>
         </CardContent>
       </Card>
 

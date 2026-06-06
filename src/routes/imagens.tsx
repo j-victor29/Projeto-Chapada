@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -95,7 +95,12 @@ interface PendingFile {
 const emptyForm = { projetoId: "", projetoNome: "", local: "", tipo: "", date: "", categoriaId: "" };
 
 function ImagensPage() {
-  const imgs = useImagens();
+  const storeImgs = useImagens();
+  const [images, setImages] = useState<ImagemItem[]>([]);
+
+  useEffect(() => {
+    setImages(storeImgs);
+  }, [storeImgs]);
   const { data: dbMunicipios = [] } = Municipios.useList();
   const categorias = useCategorias();
   const projetos = useProjetos();
@@ -141,7 +146,7 @@ function ImagensPage() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return imgs.filter((i) => {
+    return images.filter((i) => {
       const matchesQuery = !q ||
         [i.projeto, i.local, i.tipo, i.date, i.nomeArquivo, i.categoriaNome]
           .join(" ")
@@ -157,7 +162,7 @@ function ImagensPage() {
       const matchesMunicipio = selMunicipio === "todos" || i.local === selMunicipio;
       return matchesQuery && matchesCategoria && matchesData && matchesProjeto && matchesTipo && matchesMunicipio;
     });
-  }, [imgs, query, categoriaFiltro, dataDe, dataAte, selProjeto, selTipo, selMunicipio]);
+  }, [images, query, categoriaFiltro, dataDe, dataAte, selProjeto, selTipo, selMunicipio]);
 
   const openPicker = () => fileInputRef.current?.click();
 
@@ -278,9 +283,11 @@ function ImagensPage() {
       setToDelete(null);
       return;
     }
+    const deletedId = toDelete.id;
     try {
-      await removeImagem(toDelete.id);
-      removeOwnership("imagem", toDelete.id);
+      await removeImagem(deletedId);
+      removeOwnership("imagem", deletedId);
+      setImages((prev) => prev.filter((img) => img.id !== deletedId));
       toast.success("Imagem excluída.");
     } catch {
       toast.error("Erro ao excluir imagem.");
@@ -446,7 +453,7 @@ function ImagensPage() {
           <CardContent className="p-12 text-center text-muted-foreground text-sm">
             {query || categoriaFiltro.length > 0 || dataDe || dataAte
               ? "Nenhuma imagem encontrada para este filtro."
-              : imgs.length === 0
+              : images.length === 0
               ? 'Nenhuma imagem na galeria. Clique em "Enviar Imagens" para começar.'
               : "Carregando galeria..."}
           </CardContent>

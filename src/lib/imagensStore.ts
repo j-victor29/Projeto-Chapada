@@ -253,16 +253,21 @@ export const removeImagem = async (id: string) => {
     throw error;
   }
 
-  // Best-effort delete from Storage
+  // Atualiza o estado local imediatamente após o delete do banco —
+  // isso garante que a UI remove o card sem depender da operação de Storage.
+  imagens = imagens.filter((i) => i.id !== id);
+  emit();
+
+  // Best-effort delete from Storage (não-bloqueante: falha não afeta a UI)
   if (img?.url) {
     const parts = img.url.split("/imagens/");
     if (parts[1]) {
-      await supabase.storage.from("imagens").remove([parts[1]]);
+      supabase.storage
+        .from("imagens")
+        .remove([parts[1]])
+        .catch((err) => console.warn("[imagensStore] storage remove warning:", err));
     }
   }
-
-  imagens = imagens.filter((i) => i.id !== id);
-  emit();
 };
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
