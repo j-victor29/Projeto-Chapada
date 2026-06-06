@@ -18,6 +18,16 @@ import {
 import { toast } from "sonner";
 import { useDebounce } from "@/hooks/use-debounce";
 import { toTitleCase } from "@/lib/autocompleteHooks";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/cadastros")({
   component: CadastrosPage,
@@ -73,6 +83,7 @@ function CrudShell({
   const [draft, setDraft] = useState<any>(blank);
   const [localSearch, setLocalSearch] = useState("");
   const search = useDebounce(localSearch, 300);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const filteredItems = useMemo(() => {
     if (!items) return [];
@@ -171,15 +182,7 @@ function CrudShell({
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                        onClick={async () => {
-                          if (!confirm("Tem certeza que deseja excluir este registro?")) return;
-                          try {
-                            await onDelete(getId(row));
-                            toast.success("Registro excluído com sucesso!");
-                          } catch (e: any) {
-                            toast.error(e.message ?? "Erro ao excluir o registro");
-                          }
-                        }}
+                        onClick={() => setDeleteId(getId(row))}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -197,6 +200,36 @@ function CrudShell({
             </tbody>
           </table>
         </div>
+
+        <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir registro?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir este registro? Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={async () => {
+                  if (!deleteId) return;
+                  try {
+                    await onDelete(deleteId);
+                    toast.success("Registro excluído com sucesso!");
+                  } catch (e: any) {
+                    toast.error(e.message ?? "Erro ao excluir o registro");
+                  } finally {
+                    setDeleteId(null);
+                  }
+                }}
+              >
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </CardContent>
     </Card>
   );
@@ -446,12 +479,12 @@ function ComunidadesTab() {
           onClick={() => setFilter("local")}
           className="h-8 text-xs px-4"
         >
-          Locais / Espaços
+          Locais
         </Button>
       </div>
 
       <CrudShell
-        title="Comunidades & Locais/Espaços"
+        title={filter === "todos" ? "Comunidades & Locais" : filter === "comunidade" ? "Comunidades" : "Locais"}
         items={filteredData}
         columns={[
           { label: "Nome", key: "nome" },
@@ -487,7 +520,7 @@ function ComunidadesTab() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Comunidade">Comunidade</SelectItem>
-                  <SelectItem value="Local/Espaço">Local / Espaço</SelectItem>
+                  <SelectItem value="Local/Espaço">Local</SelectItem>
                 </SelectContent>
               </Select>
             </div>

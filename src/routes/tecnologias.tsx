@@ -552,13 +552,13 @@ function TecnologiasPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">Linha de Ação</Label>
+                    <Label className="text-xs font-semibold">Categoria</Label>
                     <Select value={linhaFiltro} onValueChange={setLinhaFiltro}>
                       <SelectTrigger className="h-9 text-xs">
-                        <SelectValue placeholder="Todas as linhas" />
+                        <SelectValue placeholder="Todas as categorias" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Todas as linhas</SelectItem>
+                        <SelectItem value="all">Todas as categorias</SelectItem>
                         {linhasDeAcao.map((linha) => (
                           <SelectItem key={linha} value={linha} className="text-xs">
                             {getLinhaConfig(linha).icon} {linha}
@@ -594,54 +594,6 @@ function TecnologiasPage() {
           </CardContent>
         </Card>
 
-        {/* Filtro visual de Categorias — botões/abas com scroll horizontal */}
-        <div
-          className="flex gap-2 overflow-x-auto pb-1 scroll-smooth"
-          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-        >
-          {/* Botão "Todas" */}
-          <button
-            type="button"
-            onClick={() => setLinhaFiltro("all")}
-            className={`flex items-center gap-1.5 whitespace-nowrap px-4 py-2 rounded-full text-xs font-semibold border transition-all shrink-0 ${
-              linhaFiltro === "all"
-                ? "bg-foreground text-background border-foreground shadow-sm"
-                : "bg-card text-muted-foreground border-border hover:border-foreground/40 hover:text-foreground"
-            }`}
-          >
-            ✦ Todas
-          </button>
-
-          {/* Botões das categorias que existem nos dados */}
-          {linhasDeAcao.map((linha) => {
-            const cfg = getLinhaConfig(linha);
-            const isActive = linhaFiltro === linha;
-            return (
-              <button
-                key={linha}
-                type="button"
-                onClick={() => setLinhaFiltro(isActive ? "all" : linha)}
-                className={`flex items-center gap-1.5 whitespace-nowrap px-4 py-2 rounded-full text-xs font-semibold border transition-all shrink-0 ${
-                  isActive
-                    ? "shadow-md"
-                    : "bg-card text-muted-foreground border-border hover:opacity-80"
-                }`}
-                style={
-                  isActive
-                    ? {
-                        background: cfg.bg,
-                        color: cfg.text,
-                        borderColor: cfg.border,
-                      }
-                    : undefined
-                }
-              >
-                <span>{cfg.icon}</span>
-                {linha}
-              </button>
-            );
-          })}
-        </div>
 
         {/* Conteúdo principal */}
         {loading ? (

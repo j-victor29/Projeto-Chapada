@@ -239,7 +239,7 @@ export function LocalComunidadeSelect({
               {locais.length > 0 && (
                 <>
                   <div className="px-3 pt-2 pb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide border-t mt-1">
-                    {ICON_LOCAL} Locais / Espaços
+                    {ICON_LOCAL} Locais
                   </div>
                   {locais.map((s) => (
                     <SuggestionItem
@@ -282,7 +282,7 @@ export function LocalComunidadeSelect({
             "{pendingNome}" não está cadastrado.
           </p>
           <p className="text-xs text-muted-foreground mb-3">
-            Este local é uma comunidade ou um local/espaço?
+            Este local é uma comunidade ou um local?
           </p>
           <div className="flex gap-2">
             <Button
@@ -313,7 +313,7 @@ export function LocalComunidadeSelect({
               ) : (
                 <span>{ICON_LOCAL}</span>
               )}
-              Local / Espaço
+              Local
             </Button>
             <Button
               type="button"
