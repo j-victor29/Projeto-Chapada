@@ -24,19 +24,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, MessageSquare, RefreshCw, Send, Pencil } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
 import { useGlobalSearch } from "@/contexts/SearchContext";
 import { addNotification } from "@/lib/notificationsStore";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile, fullName } from "@/lib/profileStore";
 import { toast } from "sonner";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserPresence, type UserStatus } from "@/hooks/useUserPresence";
 
@@ -179,8 +173,8 @@ function UsuariosPage() {
   const [editingUsuario, setEditingUsuario] = useState<UsuarioRow | null>(null);
   const [editName, setEditName] = useState("");
   const [editCargo, setEditCargo] = useState("");
-  const [editRole, setEditRole] = useState("admin");
   const [savingUsuario, setSavingUsuario] = useState(false);
+  const queryClient = useQueryClient();
 
   // ── Presença em tempo real ────────────────────────────────────────────────
   const { getStatusOf } = useUserPresence();
@@ -261,22 +255,32 @@ function UsuariosPage() {
     }
     setSavingUsuario(true);
     try {
+      const trimmedName = editName.trim();
+      const trimmedCargo = editCargo.trim();
+
       const { error } = await supabase
         .from("profiles")
         .update({
-          full_name: editName.trim(),
-          cargo: editCargo.trim() || null,
-          role: editRole,
+          full_name: trimmedName,
+          cargo: trimmedCargo || null,
         })
         .eq("id", editingUsuario.id);
 
       if (error) throw error;
 
-      toast.success("Usuário atualizado com sucesso!");
-      refetch();
+      // Atualiza o estado local imediatamente sem recarregar a página
+      queryClient.setQueryData<UsuarioRow[]>(["profiles_list"], (old) =>
+        (old ?? []).map((u) =>
+          u.id === editingUsuario.id
+            ? { ...u, full_name: trimmedName, cargo: trimmedCargo || null }
+            : u
+        )
+      );
+
+      toast.success("Usuário atualizado com sucesso.");
       setEditingUsuario(null);
     } catch (err: unknown) {
-      toast.error(`Erro ao atualizar usuário: ${(err as Error).message}`);
+      toast.error("Erro ao atualizar. Tente novamente.");
     } finally {
       setSavingUsuario(false);
     }
@@ -393,7 +397,6 @@ function UsuariosPage() {
                               setEditingUsuario(u);
                               setEditName(u.full_name ?? "");
                               setEditCargo(u.cargo ?? "");
-                              setEditRole(u.role ?? "admin");
                             }}
                           >
                             <Pencil className="h-4 w-4" /> Editar
@@ -493,20 +496,19 @@ function UsuariosPage() {
                 id="edit-cargo"
                 value={editCargo}
                 onChange={(e) => setEditCargo(e.target.value)}
-                placeholder="Ex: Assessor Pedagógico, Agrônomo"
+                placeholder="Administrador"
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="edit-role">Papel / Acesso</Label>
-              <Select value={editRole} onValueChange={setEditRole}>
-                <SelectTrigger id="edit-role">
-                  <SelectValue placeholder="Selecione o papel" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">Administrador (Acesso total)</SelectItem>
-                  <SelectItem value="tecnico">Técnico (Equipe em Campo)</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="edit-email">E-mail</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={editingUsuario?.email ?? ""}
+                readOnly
+                disabled
+                className="bg-muted text-muted-foreground cursor-not-allowed"
+              />
             </div>
           </div>
           <DialogFooter>

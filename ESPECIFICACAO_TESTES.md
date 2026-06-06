@@ -367,8 +367,10 @@ Fluxos completos de ponta a ponta no navegador real via **Playwright**.
 | ID | Cenário | Passos | Resultado Esperado |
 |----|---------|--------|--------------------|
 | E2E-027 | Listar tecnologias por linha de ação | 1. `/tecnologias` → 2. Filtra por "Agroecologia" | Tecnologias filtradas |
-| E2E-028 | Criar nova tecnologia social | 1. "Nova Tecnologia" → 2. Preenche nome, tipo, linha de ação → 3. Salva | Tecnologia criada |
-| E2E-029 | Editar tecnologia existente | 1. Abre tecnologia → 2. Altera tipo entrega → 3. Salva | Tipo atualizado |
+| E2E-028 | Criar nova tecnologia social | 1. "Nova Tecnologia" → 2. **Seleciona nome da lista (combobox)**, tipo, linha de ação → 3. Salva | Tecnologia criada com nome selecionado da lista |
+| E2E-029 | Editar tecnologia existente | 1. Abre tecnologia → 2. **Seleciona novo nome da lista (combobox — não aceita texto livre)** → 3. Altera tipo entrega → 4. Salva | Nome selecionado da lista e tipo de entrega atualizados corretamente no Supabase |
+
+> **⚠️ Nota sobre o campo "Nome da Tecnologia":** O campo "Nome da tecnologia" nos formulários de Tecnologia Social é um **combobox com opções predefinidas** — não aceita entrada de texto livre. Os testes E2E-028 e E2E-029 devem **selecionar uma opção existente da lista** em vez de tentar digitar um nome novo.
 
 #### 👥 Fluxo de Cadastros (Beneficiários)
 
