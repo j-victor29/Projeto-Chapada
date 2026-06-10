@@ -21,7 +21,7 @@ export function ThemeToggle() {
           <button
             key={item.id}
             onClick={() => setTheme(item.id)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+            className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-medium transition-all ${
               theme === item.id
                 ? "bg-background text-foreground shadow-sm ring-1 ring-border"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted-foreground/10"
@@ -29,7 +29,6 @@ export function ThemeToggle() {
             title={`Tema ${item.label}`}
           >
             <item.icon className="w-3.5 h-3.5" />
-            <span>{item.label}</span>
           </button>
         ))}
       </div>

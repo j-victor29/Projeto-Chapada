@@ -96,7 +96,7 @@ function LoginPage() {
         <form onSubmit={onSubmit} className="space-y-5">
           <div>
             <h2 className="font-display text-2xl font-bold" style={{ color: "#1A9FD4" }}>
-              Bem-vindo à CHAPADA!
+              Bem-vindo à Chapada!
             </h2>
             <p className="mt-1 text-sm" style={{ color: "#6B8A9A" }}>
               Entre com suas credenciais para acessar.

@@ -741,9 +741,6 @@ export default function Dashboard() {
                           {m.projetos} projeto(s) · {m.atividades} atividade(s)
                         </div>
                       </div>
-                      <Badge variant="secondary" className="font-bold text-[10px] px-2 py-0.5 rounded-full">
-                        {m.total} pts
-                      </Badge>
                     </div>
                   ))}
                 </div>
