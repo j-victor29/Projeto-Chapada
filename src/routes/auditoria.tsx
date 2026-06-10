@@ -188,7 +188,7 @@ function AuditoriaPage() {
       }
     >
       {/* Filtros */}
-      <Card className="mb-4">
+      <Card className="mb-4 chapada-filter-card">
         <CardContent className="p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -225,7 +225,7 @@ function AuditoriaPage() {
       </Card>
 
       {/* Tabela de Logs */}
-      <Card>
+      <Card className="shadow-sm">
         <CardContent className="p-0 overflow-x-auto">
           <Table>
             <TableHeader>
@@ -299,6 +299,7 @@ function AuditoriaPage() {
                         variant="ghost"
                         onClick={() => setViewing(log)}
                         title="Ver detalhes"
+                        className="chapada-icon-btn chapada-icon-btn-primary"
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
@@ -350,7 +351,7 @@ function AuditoriaPage() {
 
       {/* Modal de Detalhes */}
       <Dialog open={!!viewing} onOpenChange={(o) => !o && setViewing(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto rounded-xl border border-muted bg-card/95 backdrop-blur-md shadow-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <span

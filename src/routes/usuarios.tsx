@@ -148,8 +148,8 @@ function PresenceAvatar({
             status === "online"
               ? "rgb(34 197 94)"       // green-500
               : status === "inactive"
-              ? "rgb(245 158 11)"      // amber-500
-              : "rgb(148 163 184)",    // slate-400
+                ? "rgb(245 158 11)"      // amber-500
+                : "rgb(148 163 184)",    // slate-400
         }}
         aria-hidden="true"
       />
@@ -289,7 +289,7 @@ function UsuariosPage() {
   return (
     <AppLayout
       title="Controle de Usuários"
-      subtitle="Equipe e contatos do sistema CHAPADA"
+      subtitle="Equipe e contatos do sistema Chapada"
       actions={
         <Button
           variant="outline"
@@ -302,7 +302,7 @@ function UsuariosPage() {
         </Button>
       }
     >
-      <Card>
+      <Card className="shadow-sm">
         <CardContent className="p-0 overflow-x-auto">
           <Table>
             <TableHeader>
@@ -392,7 +392,7 @@ function UsuariosPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="gap-2"
+                            className="gap-2 chapada-btn"
                             onClick={() => {
                               setEditingUsuario(u);
                               setEditName(u.full_name ?? "");
@@ -404,7 +404,7 @@ function UsuariosPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="gap-2"
+                            className="gap-2 chapada-btn"
                             onClick={() => {
                               setRecipient(u);
                               setMessage("");
@@ -428,7 +428,7 @@ function UsuariosPage() {
         open={!!recipient}
         onOpenChange={(o) => !o && setRecipient(null)}
       >
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md rounded-xl border border-muted bg-card/95 backdrop-blur-md shadow-2xl">
           <DialogHeader>
             <DialogTitle>Enviar mensagem</DialogTitle>
             <DialogDescription>
@@ -473,7 +473,7 @@ function UsuariosPage() {
         open={!!editingUsuario}
         onOpenChange={(o) => !o && setEditingUsuario(null)}
       >
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md rounded-xl border border-muted bg-card/95 backdrop-blur-md shadow-2xl">
           <DialogHeader>
             <DialogTitle>Editar Usuário</DialogTitle>
             <DialogDescription>

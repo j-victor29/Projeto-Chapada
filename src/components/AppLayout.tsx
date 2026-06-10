@@ -103,14 +103,14 @@ export function AppLayout({
     <div className="flex min-h-screen w-full">
       <AppSidebar />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 shrink-0 border-b border-border bg-card/60 backdrop-blur-sm flex items-center px-4 md:px-8 gap-4">
+        <header className="h-16 shrink-0 border-b border-border/60 bg-card/70 backdrop-blur-md flex items-center px-4 md:px-8 gap-4 shadow-sm">
           <div className="flex-1 min-w-0">
             <h1 className="text-lg md:text-xl font-display font-semibold truncate">{title}</h1>
             {subtitle && (
               <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
             )}
           </div>
-          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/60 border border-border w-72">
+          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-background/50 border border-border/70 w-72 backdrop-blur-sm transition-all focus-within:border-primary/40 focus-within:bg-background/70">
             <Search className="h-4 w-4 text-muted-foreground" />
             <input
               placeholder="Buscar nesta página..."

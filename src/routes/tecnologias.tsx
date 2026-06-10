@@ -423,9 +423,9 @@ function TecnologiasPage() {
   return (
     <AppLayout
       title="Tecnologias Sociais"
-      subtitle="Registro e monitoramento das tecnologias implementadas pela CHAPADA"
+      subtitle="Registro e monitoramento das tecnologias implementadas pela Chapada"
       actions={
-        <Button onClick={() => openCreate()} className="gap-2">
+        <Button onClick={() => openCreate()} className="gap-2 chapada-btn">
           <Plus className="h-4 w-4" /> Nova Tecnologia
         </Button>
       }
@@ -433,7 +433,7 @@ function TecnologiasPage() {
       <div className="space-y-6">
         {/* Cards de métricas */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
+          <Card className="shadow-sm">
             <CardContent className="p-5 flex items-center justify-between">
               <div className="space-y-1">
                 <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
@@ -448,7 +448,7 @@ function TecnologiasPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="shadow-sm">
             <CardContent className="p-5 flex items-center justify-between">
               <div className="space-y-1">
                 <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
@@ -465,7 +465,7 @@ function TecnologiasPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="shadow-sm">
             <CardContent className="p-5 flex items-center justify-between">
               <div className="space-y-1">
                 <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
@@ -482,7 +482,7 @@ function TecnologiasPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="shadow-sm">
             <CardContent className="p-5 flex items-center justify-between">
               <div className="space-y-1">
                 <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
@@ -503,7 +503,7 @@ function TecnologiasPage() {
         </div>
 
         {/* Card de Filtros: Período + Avançados */}
-        <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
+        <Card className="chapada-filter-card">
           <CardContent className="p-4 flex flex-wrap gap-4 items-center justify-between">
             <div className="flex flex-wrap gap-3 items-center">
               <div className="flex items-center gap-2">
@@ -601,12 +601,14 @@ function TecnologiasPage() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : gruposOrdenados.length === 0 ? (
-          <div className="p-16 text-center text-muted-foreground">
-            <Info className="h-12 w-12 mx-auto mb-4 text-muted" />
-            <p className="text-base font-medium">
+          <div className="chapada-empty">
+            <div className="chapada-empty-icon">
+              <Info className="h-8 w-8" />
+            </div>
+            <p className="text-base font-semibold text-foreground mb-1">
               Nenhum registro de tecnologia encontrado.
             </p>
-            <p className="text-sm mt-1">
+            <p className="text-sm text-muted-foreground">
               Tente ajustar os filtros ou cadastre uma nova tecnologia.
             </p>
           </div>
@@ -754,7 +756,7 @@ function TecnologiasPage() {
                                 <Button
                                   size="icon"
                                   variant="ghost"
-                                  className="h-8 w-8"
+                                  className="h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary transition-all"
                                   onClick={() => openEdit(tec)}
                                 >
                                   <Pencil className="h-3.5 w-3.5" />
@@ -762,7 +764,7 @@ function TecnologiasPage() {
                                 <Button
                                   size="icon"
                                   variant="ghost"
-                                  className="h-8 w-8 text-destructive hover:text-destructive"
+                                  className="h-8 w-8 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10 transition-all"
                                   onClick={() => requestDelete(tec)}
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
@@ -1046,9 +1048,9 @@ function TecnologiaModal({
             linhaConfig
               ? { background: linhaConfig.bg }
               : {
-                  background:
-                    "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
-                }
+                background:
+                  "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+              }
           }
         >
           <DialogTitle className="text-white text-lg font-bold leading-snug">

@@ -263,10 +263,10 @@ function IndicadoresPage() {
       subtitle="Análise consolidada por público, território e período"
       actions={
         <>
-          <Button variant="outline" className="gap-2" onClick={exportPDF}>
+          <Button variant="outline" className="gap-2 chapada-btn" onClick={exportPDF}>
             <FileDown className="h-4 w-4" /> Exportar PDF
           </Button>
-          <Button className="gap-2" onClick={exportExcel}>
+          <Button className="gap-2 chapada-btn" onClick={exportExcel}>
             <FileSpreadsheet className="h-4 w-4" /> Exportar Excel
           </Button>
         </>
@@ -274,7 +274,7 @@ function IndicadoresPage() {
     >
       <div className="space-y-4">
         {/* Card de Filtros: Período */}
-        <Card className="border border-muted/80 bg-card/60 backdrop-blur-md shadow-sm rounded-xl overflow-hidden">
+        <Card className="chapada-filter-card">
           <CardContent className="p-4 flex flex-wrap gap-4 items-center justify-between">
             <div className="flex flex-wrap gap-3 items-center">
               <div className="flex items-center gap-2">
@@ -307,7 +307,7 @@ function IndicadoresPage() {
         </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader><CardTitle className="text-base">Beneficiários por Grupo</CardTitle></CardHeader>
           <CardContent className="h-80" ref={barRef}>
             {beneficiarios.every((b) => b.total === 0) ? (
@@ -328,7 +328,7 @@ function IndicadoresPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader><CardTitle className="text-base">Distribuição por Município</CardTitle></CardHeader>
           <CardContent className="h-80" ref={pieRef}>
             {porMunicipio.length === 0 ? (
@@ -355,7 +355,7 @@ function IndicadoresPage() {
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {beneficiarios.map((b) => (
-              <div key={b.grupo} className="text-center p-4 bg-muted/40 rounded-lg">
+              <div key={b.grupo} className="text-center p-4 bg-muted/50 rounded-xl border border-border/50 hover:bg-muted/70 transition-colors">
                 <div className="text-2xl font-display font-semibold text-primary">
                   {b.total.toLocaleString("pt-BR")}
                 </div>

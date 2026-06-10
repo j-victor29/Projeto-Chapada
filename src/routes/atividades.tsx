@@ -479,13 +479,13 @@ function AtividadesPage() {
       title="Registro de Atividades"
       subtitle="Histórico de ações realizadas nos projetos"
       actions={
-        <Button className="gap-2" onClick={openNew}>
+        <Button className="gap-2 chapada-btn" onClick={openNew}>
           <Plus className="h-4 w-4" /> Nova Atividade
         </Button>
       }
     >
       {/* ─── FILTROS DE ATIVIDADES ───────────────────────────────────────────── */}
-      <Card className="mb-4 border-border/50 bg-card/60 backdrop-blur-sm">
+      <Card className="mb-4 chapada-filter-card">
         <CardContent className="p-4 flex flex-wrap gap-4 items-center justify-between">
           <div className="flex flex-wrap gap-3 items-center">
             <div className="flex items-center gap-2">
@@ -578,7 +578,7 @@ function AtividadesPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="shadow-sm">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-display text-lg font-semibold">
@@ -604,7 +604,7 @@ function AtividadesPage() {
                 return (
                   <li key={a.id} className="ml-6">
                     <span className="absolute -left-[9px] h-4 w-4 rounded-full bg-primary border-2 border-background" />
-                    <div className="bg-muted/40 rounded-lg p-4 group">
+                    <div className="bg-muted/40 hover:bg-muted/60 rounded-xl p-4 group transition-all duration-200 border border-transparent hover:border-border/40">
                       <div className="flex flex-wrap items-center gap-2 mb-2">
                         {projeto && (
                           <Badge className="bg-primary/10 text-primary border border-primary/30 hover:bg-primary/15">
@@ -620,7 +620,7 @@ function AtividadesPage() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="h-7 w-7"
+                            className="h-7 w-7 rounded-lg hover:bg-primary/10 hover:text-primary transition-all"
                             onClick={() => openEdit(a)}
                             aria-label="Editar"
                           >
@@ -629,7 +629,7 @@ function AtividadesPage() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            className="h-7 w-7 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10 transition-all"
                             onClick={() => requestDelete(a)}
                             aria-label="Excluir"
                           >
@@ -694,7 +694,7 @@ function AtividadesPage() {
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-muted bg-card/95 backdrop-blur-md shadow-2xl">
           <DialogHeader>
             <DialogTitle>
               {editingId ? "Editar Atividade" : "Nova Atividade"}

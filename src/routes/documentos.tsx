@@ -298,7 +298,7 @@ function DocumentosPage() {
           }}
         >
           <DialogTrigger asChild>
-            <Button className="bg-primary hover:bg-primary/90 text-white font-medium flex items-center gap-1.5 shadow-sm transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]">
+            <Button className="gap-1.5 chapada-btn">
               <Plus className="h-4 w-4" /> Novo documento
             </Button>
           </DialogTrigger>

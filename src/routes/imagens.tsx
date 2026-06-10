@@ -322,14 +322,14 @@ function ImagensPage() {
             className="hidden"
             onChange={onFileChange}
           />
-          <Button onClick={openPicker} className="gap-2">
+          <Button onClick={openPicker} className="gap-2 chapada-btn">
             <Upload className="h-4 w-4" /> Enviar Imagens
           </Button>
         </>
       }
     >
       {/* ─── FILTROS DE PERÍODO + AVANÇADOS ───────────────────────────────────── */}
-      <Card className="mb-4 border-border/50 bg-card/60 backdrop-blur-sm">
+      <Card className="mb-4 chapada-filter-card">
         <CardContent className="p-4 flex flex-col gap-3">
           <div className="flex flex-wrap gap-4 items-center justify-between">
             <div className="flex flex-wrap gap-3 items-center">
@@ -449,21 +449,29 @@ function ImagensPage() {
       </Card>
 
       {filtered.length === 0 ? (
-        <Card>
-          <CardContent className="p-12 text-center text-muted-foreground text-sm">
+        <div className="chapada-empty">
+          <div className="chapada-empty-icon">
+            <FolderOpen className="h-8 w-8" />
+          </div>
+          <h3 className="text-base font-semibold text-foreground mb-1">
             {query || categoriaFiltro.length > 0 || dataDe || dataAte
               ? "Nenhuma imagem encontrada para este filtro."
               : images.length === 0
-              ? 'Nenhuma imagem na galeria. Clique em "Enviar Imagens" para começar.'
+              ? "Galeria vazia"
               : "Carregando galeria..."}
-          </CardContent>
-        </Card>
+          </h3>
+          {images.length === 0 && !query && (
+            <p className="text-sm text-muted-foreground">
+              Clique em "Enviar Imagens" para começar.
+            </p>
+          )}
+        </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filtered.map((img) => (
             <Card
               key={img.id}
-              className="overflow-hidden group cursor-pointer hover:shadow-[var(--shadow-elevated)] transition-shadow relative"
+              className="chapada-card overflow-hidden group cursor-pointer transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 relative"
             >
               <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
@@ -540,7 +548,7 @@ function ImagensPage() {
           }
         }}
       >
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md rounded-xl border border-muted bg-card/95 backdrop-blur-md shadow-2xl">
           <DialogHeader>
             <DialogTitle>{isEditMode ? "Editar Imagem" : "Nova Imagem"}</DialogTitle>
             <DialogDescription>
@@ -745,7 +753,7 @@ function ImagensPage() {
       </Dialog>
 
       <AlertDialog open={!!toDelete} onOpenChange={(o) => !o && setToDelete(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-xl border border-muted bg-card/95 backdrop-blur-md shadow-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>Deseja excluir esta imagem?</AlertDialogTitle>
             <AlertDialogDescription>

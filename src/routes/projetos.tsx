@@ -490,11 +490,11 @@ function ProjetosPage() {
       actions={
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button onClick={openNew} className="gap-2">
+            <Button onClick={openNew} className="gap-2 chapada-btn">
               <Plus className="h-4 w-4" /> Novo Projeto
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-muted bg-card/95 backdrop-blur-md shadow-2xl">
             <DialogHeader>
               <DialogTitle>{editing.id ? "Editar Projeto" : "Novo Projeto"}</DialogTitle>
             </DialogHeader>
@@ -897,7 +897,7 @@ function ProjetosPage() {
       }
     >
       {/* Filters */}
-      <Card className="mb-4">
+      <Card className="mb-4 chapada-filter-card">
         <CardContent className="p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
           <div className="relative">
             <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -945,7 +945,7 @@ function ProjetosPage() {
       </Card>
 
       {/* Table */}
-      <Card>
+      <Card className="shadow-sm">
         <CardContent className="p-0 overflow-x-auto">
           <Table>
             <TableHeader>
@@ -1045,16 +1045,16 @@ function ProjetosPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Button size="icon" variant="ghost" onClick={() => openEdit(p)}>
+                        <Button size="icon" variant="ghost" onClick={() => openEdit(p)} className="chapada-icon-btn chapada-icon-btn-primary">
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive">
+                            <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive chapada-icon-btn chapada-icon-btn-destructive">
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </AlertDialogTrigger>
-                          <AlertDialogContent>
+                            <AlertDialogContent className="rounded-xl border border-muted bg-card/95 backdrop-blur-md shadow-2xl">
                             <AlertDialogHeader>
                               <AlertDialogTitle>Remover projeto?</AlertDialogTitle>
                               <AlertDialogDescription>

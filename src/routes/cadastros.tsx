@@ -99,7 +99,7 @@ function CrudShell({
   }, [items, search, columns, getRowValues]);
 
   return (
-    <Card className="border-border/60 hover:shadow-soft transition-shadow">
+    <Card className="chapada-filter-card shadow-sm">
       <CardContent className="p-4 md:p-6 space-y-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <h3 className="font-medium text-lg text-foreground/90">{title}</h3>
@@ -117,11 +117,11 @@ function CrudShell({
             
             <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setDraft(blank); }}>
               <DialogTrigger asChild>
-                <Button size="sm" className="gap-1 shadow-sm">
+                <Button size="sm" className="gap-1 shadow-sm chapada-btn">
                   <Plus className="h-4 w-4" /> Novo
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+              <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto rounded-xl border border-muted bg-card/95 backdrop-blur-md shadow-2xl">
                 <DialogHeader>
                   <DialogTitle>{draft.id ? "Editar" : "Novo"} — {title}</DialogTitle>
                 </DialogHeader>
@@ -171,7 +171,7 @@ function CrudShell({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 hover:bg-muted/80 text-muted-foreground hover:text-foreground"
+                        className="h-8 w-8 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all"
                         onClick={() => { setDraft({ ...row }); setOpen(true); }}
                       >
                         <Pencil className="h-4 w-4" />
@@ -181,7 +181,7 @@ function CrudShell({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                        className="h-8 w-8 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all"
                         onClick={() => setDeleteId(getId(row))}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -202,7 +202,7 @@ function CrudShell({
         </div>
 
         <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
-          <AlertDialogContent>
+          <AlertDialogContent className="rounded-xl border border-muted bg-card/95 backdrop-blur-md shadow-2xl">
             <AlertDialogHeader>
               <AlertDialogTitle>Excluir registro?</AlertDialogTitle>
               <AlertDialogDescription>

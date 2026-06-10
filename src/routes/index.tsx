@@ -9,7 +9,7 @@ export const Route = createFileRoute("/")({
   component: () => (
     <Suspense
       fallback={
-        <AppLayout title="Dashboard" subtitle="Visão geral dos projetos e impacto social da CHAPADA">
+        <AppLayout title="Dashboard" subtitle="Visão geral dos projetos e impacto social da Chapada">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Skeleton className="h-28 w-full rounded-xl" />
             <Skeleton className="h-28 w-full rounded-xl" />

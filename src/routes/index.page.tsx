@@ -338,10 +338,10 @@ export default function Dashboard() {
   return (
     <AppLayout
       title="Dashboard"
-      subtitle="Visão geral dos projetos e impacto social da CHAPADA"
+      subtitle="Visão geral dos projetos e impacto social da Chapada"
     >
       {/* ─── FILTROS DO DASHBOARD ────────────────────────────────────────────── */}
-      <Card className="mb-6 border-border/50 bg-card/60 backdrop-blur-sm">
+      <Card className="mb-6 chapada-filter-card">
         <CardContent className="p-4 flex flex-wrap gap-4 items-center justify-between">
           <div className="flex flex-wrap gap-3 items-center">
             <div className="flex items-center gap-2">
@@ -361,7 +361,7 @@ export default function Dashboard() {
 
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-9 gap-2">
+                <Button variant="outline" size="sm" className="h-9 gap-2 chapada-btn">
                   <Filter className="h-4 w-4" />
                   Filtros Avançados
                   {hasActiveFilters && (
@@ -489,9 +489,8 @@ export default function Dashboard() {
                       </AvatarFallback>
                     </Avatar>
                     <span
-                      className={`absolute bottom-0 right-0 block h-2 w-2 rounded-full ring-1 ring-background ${
-                        u.status === "online" ? "bg-green-500" : "bg-amber-500"
-                      }`}
+                      className={`absolute bottom-0 right-0 block h-2 w-2 rounded-full ring-1 ring-background ${u.status === "online" ? "bg-green-500" : "bg-amber-500"
+                        }`}
                       aria-hidden="true"
                     />
                     <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-[10px] font-medium text-white bg-black/80 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
@@ -683,7 +682,7 @@ export default function Dashboard() {
         {/* Right Column (Alertas & Top Municipios) */}
         <div className="space-y-6">
           {/* Alerts Panel */}
-          <Card className="border-t-4 border-t-terracotta">
+          <Card className="border-t-4 border-t-terracotta shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-terracotta" />
@@ -700,11 +699,10 @@ export default function Dashboard() {
                   {alerts.map((al, idx) => (
                     <div
                       key={idx}
-                      className={`p-3 rounded-lg border text-xs flex gap-2.5 items-start ${
-                        al.type === "error"
+                      className={`p-3 rounded-lg border text-xs flex gap-2.5 items-start ${al.type === "error"
                           ? "bg-destructive/5 border-destructive/20 text-destructive"
                           : "bg-terracotta/5 border-terracotta/20 text-terracotta-foreground"
-                      }`}
+                        }`}
                     >
                       <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
                       <div>
@@ -719,7 +717,7 @@ export default function Dashboard() {
           </Card>
 
           {/* Top Municipios Panel */}
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <MapPin className="h-4 w-4 text-savanna" />
@@ -728,9 +726,13 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               {topMunicipios.length === 0 ? (
-                <p className="text-xs text-muted-foreground py-8 text-center">
-                  Sem municípios / Sem registros para os filtros atuais.
-                </p>
+                <div className="chapada-empty py-8">
+                  <div className="chapada-empty-icon">
+                    <MapPin className="h-6 w-6" />
+                  </div>
+                  <p className="text-sm font-semibold text-foreground mb-1">Nenhum município</p>
+                  <p className="text-xs text-muted-foreground">Sem registros para os filtros atuais.</p>
+                </div>
               ) : (
                 <div className="space-y-4 max-h-80 overflow-y-auto pr-1">
                   {topMunicipios.map((m) => (
