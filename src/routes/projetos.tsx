@@ -78,6 +78,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useComunidadesAutocomplete, useIbgeAutocomplete, useFavoritos } from "@/lib/autocompleteHooks";
+import { useFormValidation } from "@/hooks/useFormValidation";
 
 export const Route = createFileRoute("/projetos")({
   component: () => (
@@ -151,6 +152,32 @@ function ProjetosPage() {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<EditingState>(emptyProjeto);
+
+  // Validation rules using useFormValidation
+  const validationRules = useMemo(() => ({
+    required: ["nome", "contrato", "financiador", "inicio", "termino", "municipios"],
+    minChars: {
+      nome: { min: 3, message: "O nome deve ter pelo menos 3 caracteres" },
+    },
+    currency: ["valor"],
+    custom: [
+      (values: any, errors: Record<string, string>) => {
+        if (values.inicio && values.termino) {
+          const s = new Date(values.inicio);
+          const e = new Date(values.termino);
+          if (!isNaN(s.getTime()) && !isNaN(e.getTime()) && s > e) {
+            errors.termino = "A data de término deve ser igual ou posterior à data de início";
+          }
+        }
+        if (values.municipios && values.municipios.length === 0) {
+          errors.municipios = "Selecione pelo menos um município";
+        }
+      }
+    ]
+  }), []);
+
+  const { isValid, errors: validationErrors } = useFormValidation(editing, validationRules);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const editingOwnership = useOwnership("projeto", editing.id ?? "");
 
   // ── Estado: Financiadora inline ──────────────────────────────────────────
@@ -461,6 +488,7 @@ function ProjetosPage() {
     setShowNewFinanciador(false);
     setNewFinanciadorNome("");
     setComunidadeInput("");
+    setFormErrors({});
     setOpen(true);
   };
   const openEdit = (p: ProjetoDB) => {
@@ -469,14 +497,17 @@ function ProjetosPage() {
     setShowNewFinanciador(false);
     setNewFinanciadorNome("");
     setComunidadeInput("");
+    setFormErrors({});
     setOpen(true);
   };
 
   const save = async () => {
-    if (!editing.nome || !editing.financiador) {
-      toast.error("Preencha nome e financiador.");
+    if (!isValid) {
+      setFormErrors(validationErrors);
+      toast.error("Corrija os erros antes de salvar.");
       return;
     }
+    setFormErrors({});
     setSaving(true);
     try {
       if (editing.id) {
@@ -525,23 +556,27 @@ function ProjetosPage() {
             </DialogHeader>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2">
               <div className="md:col-span-2">
-                <Label>Nome do Projeto</Label>
+                <Label>Nome do Projeto *</Label>
                 <Input
                   value={editing.nome}
                   onChange={(e) => setEditing({ ...editing, nome: e.target.value })}
+                  className={formErrors.nome ? "border-red-500 focus-visible:ring-red-500" : ""}
                 />
+                {formErrors.nome && <p className="text-xs text-red-500 mt-1">{formErrors.nome}</p>}
               </div>
               <div>
-                <Label>Nº do Contrato/Convênio</Label>
+                <Label>Nº do Contrato/Convênio *</Label>
                 <Input
                   value={editing.contrato}
                   onChange={(e) => setEditing({ ...editing, contrato: e.target.value })}
+                  className={formErrors.contrato ? "border-red-500 focus-visible:ring-red-500" : ""}
                 />
+                {formErrors.contrato && <p className="text-xs text-red-500 mt-1">{formErrors.contrato}</p>}
               </div>
 
               {/* ── FINANCIADORA ──────────────────────────────────────────── */}
               <div>
-                <Label>Instituição Financiadora</Label>
+                <Label>Instituição Financiadora *</Label>
                 <Select
                   value={showNewFinanciador ? "__add_new__" : (editing.financiadorId || undefined)}
                   onValueChange={(v) => {
@@ -556,9 +591,10 @@ function ProjetosPage() {
                       financiadorId: v,
                       financiador: selectedFin?.nome ?? "",
                     });
+                    if (formErrors.financiador) setFormErrors(prev => ({ ...prev, financiador: "" }));
                   }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={formErrors.financiador ? "border-red-500" : ""}>
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
@@ -579,6 +615,7 @@ function ProjetosPage() {
                     </SelectItem>
                   </SelectContent>
                 </Select>
+                {formErrors.financiador && <p className="text-xs text-red-500 mt-1">{formErrors.financiador}</p>}
 
                 {/* Campo inline para nova financiadora */}
                 {showNewFinanciador && (
@@ -622,20 +659,24 @@ function ProjetosPage() {
               </div>
 
               <div>
-                <Label>Data de Início</Label>
+                <Label>Data de Início *</Label>
                 <Input
                   type="date"
                   value={editing.inicio}
                   onChange={(e) => setEditing({ ...editing, inicio: e.target.value })}
+                  className={formErrors.inicio ? "border-red-500 focus-visible:ring-red-500" : ""}
                 />
+                {formErrors.inicio && <p className="text-xs text-red-500 mt-1">{formErrors.inicio}</p>}
               </div>
               <div>
-                <Label>Data de Término</Label>
+                <Label>Data de Término *</Label>
                 <Input
                   type="date"
                   value={editing.termino}
                   onChange={(e) => setEditing({ ...editing, termino: e.target.value })}
+                  className={formErrors.termino ? "border-red-500 focus-visible:ring-red-500" : ""}
                 />
+                {formErrors.termino && <p className="text-xs text-red-500 mt-1">{formErrors.termino}</p>}
               </div>
               <div>
                 <Label>Valor Total (R$)</Label>
@@ -643,6 +684,7 @@ function ProjetosPage() {
                   value={editing.valor}
                   onChange={(v) => setEditing({ ...editing, valor: v || 0 })}
                 />
+                {formErrors.valor && <p className="text-xs text-red-500 mt-1">{formErrors.valor}</p>}
               </div>
               <div>
                 <Label>Status</Label>
@@ -756,6 +798,7 @@ function ProjetosPage() {
                       <span className="text-xs text-muted-foreground italic">Nenhum município vinculado a este projeto</span>
                     )}
                   </div>
+                  {formErrors.municipios && <p className="text-xs text-red-500 mt-1">{formErrors.municipios}</p>}
                 </div>
 
                 {/* ── COMUNIDADES — Campo Híbrido ──────────────────────────── */}

@@ -118,11 +118,50 @@ function ImagensPage() {
   const [selProjeto, setSelProjeto] = useState("todos");
   const [selTipo, setSelTipo] = useState("todos");
   const [selMunicipio, setSelMunicipio] = useState("todos");
+  const [filtroAtividade, setFiltroAtividade] = useState("todos");
+  const [filtroAcaoIndependente, setFiltroAcaoIndependente] = useState("todos");
+
+  const { data: atividadesWithImgs = [] } = useQuery({
+    queryKey: ["atividades-with-imgs"],
+    enabled: !!session,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("arquivos_midia")
+        .select("atividade:atividades(id, titulo, descricao, projeto_id, data)")
+        .eq("tipo_arquivo", "imagem");
+      if (error) throw error;
+      
+      const seen = new Set<string>();
+      const list: any[] = [];
+      for (const item of data ?? []) {
+        const at = item.atividade as any;
+        if (at && !seen.has(at.id)) {
+          seen.add(at.id);
+          list.push(at);
+        }
+      }
+      return list.sort((a, b) => (b.data || "").localeCompare(a.data || ""));
+    }
+  });
+
+  const atividadesComProjeto = useMemo(() => atividadesWithImgs.filter(at => at.projeto_id), [atividadesWithImgs]);
+  const acoesIndependentes = useMemo(() => atividadesWithImgs.filter(at => !at.projeto_id), [atividadesWithImgs]);
+
+  const formatIsoDate = (dateStr?: string | null) => {
+    if (!dateStr) return "—";
+    try {
+      const [y, m, d] = dateStr.split("-");
+      if (!y || !m || !d) return dateStr;
+      return `${d}/${m}/${y}`;
+    } catch {
+      return dateStr;
+    }
+  };
 
   // Reset page to 0 on filter change
   useEffect(() => {
     setPage(0);
-  }, [dataDe, dataAte, categoriaFiltro, selProjeto, selTipo, selMunicipio, query]);
+  }, [dataDe, dataAte, categoriaFiltro, selProjeto, selTipo, selMunicipio, filtroAtividade, filtroAcaoIndependente, query]);
 
   const hasActiveFilters = useMemo(() => {
     return (
@@ -131,9 +170,11 @@ function ImagensPage() {
       categoriaFiltro.length > 0 ||
       selProjeto !== "todos" ||
       selTipo !== "todos" ||
-      selMunicipio !== "todos"
+      selMunicipio !== "todos" ||
+      filtroAtividade !== "todos" ||
+      filtroAcaoIndependente !== "todos"
     );
-  }, [dataDe, dataAte, categoriaFiltro, selProjeto, selTipo, selMunicipio]);
+  }, [dataDe, dataAte, categoriaFiltro, selProjeto, selTipo, selMunicipio, filtroAtividade, filtroAcaoIndependente]);
 
   const isPeriodInvalid = !!(dataDe && dataAte && dataDe > dataAte);
 
@@ -144,6 +185,8 @@ function ImagensPage() {
     setSelProjeto("todos");
     setSelTipo("todos");
     setSelMunicipio("todos");
+    setFiltroAtividade("todos");
+    setFiltroAcaoIndependente("todos");
   };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -152,7 +195,7 @@ function ImagensPage() {
   const [saving, setSaving] = useState(false);
 
   const { data: paginatedData, isLoading: isListLoading } = useQuery({
-    queryKey: ["arquivos_midia-paginated", page, dataDe, dataAte, selProjeto, selTipo, selMunicipio, categoriaFiltro, query],
+    queryKey: ["arquivos_midia-paginated", page, dataDe, dataAte, selProjeto, selTipo, selMunicipio, categoriaFiltro, filtroAtividade, filtroAcaoIndependente, query],
     enabled: !!session,
     queryFn: async () => {
       let qBuilder = supabase
@@ -168,6 +211,12 @@ function ImagensPage() {
       }
       if (selMunicipio !== "todos") {
         qBuilder = qBuilder.eq("local", selMunicipio);
+      }
+      if (filtroAtividade !== "todos") {
+        qBuilder = qBuilder.eq("atividade_id", filtroAtividade);
+      }
+      if (filtroAcaoIndependente !== "todos") {
+        qBuilder = qBuilder.eq("atividade_id", filtroAcaoIndependente);
       }
       if (dataDe) {
         qBuilder = qBuilder.gte("data", dataDe);
@@ -501,6 +550,46 @@ function ImagensPage() {
                   </Select>
                 </div>
 
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Atividade</Label>
+                  <Select value={filtroAtividade} onValueChange={setFiltroAtividade}>
+                    <SelectTrigger className="h-9 text-xs bg-background/50">
+                      <SelectValue placeholder="Todas" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60 rounded-lg shadow-lg border">
+                      <SelectItem value="todos" className="text-xs">Todas</SelectItem>
+                      {atividadesComProjeto.map((at) => {
+                        const label = `${at.titulo || at.descricao?.slice(0, 30) || "Sem título"} (${formatIsoDate(at.data)})`;
+                        return (
+                          <SelectItem key={at.id} value={at.id} className="text-xs">
+                            {label}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Ação Independente</Label>
+                  <Select value={filtroAcaoIndependente} onValueChange={setFiltroAcaoIndependente}>
+                    <SelectTrigger className="h-9 text-xs bg-background/50">
+                      <SelectValue placeholder="Todas" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60 rounded-lg shadow-lg border">
+                      <SelectItem value="todos" className="text-xs">Todas</SelectItem>
+                      {acoesIndependentes.map((at) => {
+                        const label = `${at.titulo || at.descricao?.slice(0, 30) || "Sem título"} (${formatIsoDate(at.data)})`;
+                        return (
+                          <SelectItem key={at.id} value={at.id} className="text-xs">
+                            {label}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+
               </PopoverContent>
             </Popover>
           </div>
@@ -589,7 +678,7 @@ function ImagensPage() {
                       {img.tipo}
                     </Badge>
                     {img.categoriaNome && (
-                      <Badge variant="outline" className="text-[10px]">
+                      <Badge className="text-[10px] bg-terracotta/15 text-terracotta border-terracotta/30 border">
                         {img.categoriaNome}
                       </Badge>
                     )}
@@ -667,7 +756,7 @@ function ImagensPage() {
             </div>
             {categorias.length > 0 && (
               <div>
-                <Label>Categorias</Label>
+                <Label>Categoria Temática</Label>
                 <Select
                   value={form.categoriaId}
                   onValueChange={(v) => setForm((f) => ({ ...f, categoriaId: v }))}

@@ -18,6 +18,7 @@ interface Props {
   value: string;
   onValueChange: (v: string) => void;
   disabled?: boolean;
+  className?: string;
 }
 
 /**
@@ -31,7 +32,7 @@ interface Props {
  * - Após salvar, seleciona automaticamente o novo tipo
  * - Compartilhado entre "Nova Atividade" e "Nova Ação Independente"
  */
-export function TipoAcaoSelect({ value, onValueChange, disabled }: Props) {
+export function TipoAcaoSelect({ value, onValueChange, disabled, className }: Props) {
   const { tipos, loading, adicionarTipo } = useTiposAcao();
   const [showNovoInput, setShowNovoInput] = useState(false);
   const [novoNome, setNovoNome] = useState("");
@@ -106,7 +107,7 @@ export function TipoAcaoSelect({ value, onValueChange, disabled }: Props) {
         onValueChange={handleSelectChange}
         disabled={disabled || loading}
       >
-        <SelectTrigger>
+        <SelectTrigger className={className}>
           <SelectValue placeholder={loading ? "Carregando..." : "Selecione"} />
         </SelectTrigger>
         <SelectContent>

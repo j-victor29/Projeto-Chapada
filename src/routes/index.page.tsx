@@ -118,8 +118,8 @@ export default function Dashboard() {
 
   // ─── Filtered Activities ────────────────────────────────────────────────────
   const allAtividadesRaw = useMemo(() => {
-    return [...atividadesVinculadas, ...atividadesIndependentes];
-  }, [atividadesVinculadas, atividadesIndependentes]);
+    return atividadesVinculadas;
+  }, [atividadesVinculadas]);
 
   const filteredAtividades = useMemo(() => {
     return allAtividadesRaw.filter((a) => {

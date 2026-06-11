@@ -1,6 +1,7 @@
 import { useSyncExternalStore, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { ProjetoStatus } from "@/lib/mockData";
+import { trimText } from "@/utils/sanitize";
 
 export interface ProjetoDB {
   id: string;
@@ -103,20 +104,27 @@ export const initProjetos = async () => {
 export const addProjeto = async (
   p: Omit<ProjetoDB, "id">
 ): Promise<ProjetoDB> => {
+  const sanitizedNome = trimText(p.nome);
+  const sanitizedContrato = trimText(p.contrato).toUpperCase();
+  const sanitizedFinanciador = trimText(p.financiador);
+  const sanitizedPublicoCaract = p.publicoCaract ? trimText(p.publicoCaract) : "";
+  const sanitizedMunicipios = (p.municipios || []).map(trimText);
+  const sanitizedComunidades = (p.comunidadesAtendidas || []).map(trimText);
+
   const { data, error } = await supabase
     .from("projetos")
     .insert({
-      nome: p.nome,
-      contrato: p.contrato,
-      financiador: p.financiador,
+      nome: sanitizedNome,
+      contrato: sanitizedContrato,
+      financiador: sanitizedFinanciador,
       financiador_id: p.financiadorId || null,
       inicio: p.inicio,
       termino: p.termino,
       valor: p.valor,
-      municipios: p.municipios,
-      comunidades_atendidas: p.comunidadesAtendidas || [],
+      municipios: sanitizedMunicipios,
+      comunidades_atendidas: sanitizedComunidades,
       publico_quant: p.publicoQuant,
-      publico_caract: p.publicoCaract || null,
+      publico_caract: sanitizedPublicoCaract || null,
       status: p.status,
     })
     .select()
@@ -128,7 +136,7 @@ export const addProjeto = async (
   }
 
   const novo = rowToProjeto(data);
-  await syncProjetoMunicipios(novo.id, p.municipios);
+  await syncProjetoMunicipios(novo.id, sanitizedMunicipios);
   projetos = [novo, ...projetos];
   emit();
   return novo;
@@ -139,23 +147,23 @@ export const updateProjeto = async (
   patch: Partial<Omit<ProjetoDB, "id">>
 ) => {
   const updatePayload: Record<string, unknown> = {};
-  if (patch.nome !== undefined) updatePayload.nome = patch.nome;
-  if (patch.contrato !== undefined) updatePayload.contrato = patch.contrato;
+  if (patch.nome !== undefined) updatePayload.nome = trimText(patch.nome);
+  if (patch.contrato !== undefined) updatePayload.contrato = trimText(patch.contrato).toUpperCase();
   if (patch.financiador !== undefined)
-    updatePayload.financiador = patch.financiador;
+    updatePayload.financiador = trimText(patch.financiador);
   if (patch.financiadorId !== undefined)
     updatePayload.financiador_id = patch.financiadorId || null;
   if (patch.inicio !== undefined) updatePayload.inicio = patch.inicio;
   if (patch.termino !== undefined) updatePayload.termino = patch.termino;
   if (patch.valor !== undefined) updatePayload.valor = patch.valor;
   if (patch.municipios !== undefined)
-    updatePayload.municipios = patch.municipios;
+    updatePayload.municipios = (patch.municipios || []).map(trimText);
   if (patch.comunidadesAtendidas !== undefined)
-    updatePayload.comunidades_atendidas = patch.comunidadesAtendidas;
+    updatePayload.comunidades_atendidas = (patch.comunidadesAtendidas || []).map(trimText);
   if (patch.publicoQuant !== undefined)
     updatePayload.publico_quant = patch.publicoQuant;
   if (patch.publicoCaract !== undefined)
-    updatePayload.publico_caract = patch.publicoCaract;
+    updatePayload.publico_caract = patch.publicoCaract ? trimText(patch.publicoCaract) : "";
   if (patch.status !== undefined) updatePayload.status = patch.status;
 
   const { error } = await supabase
@@ -169,11 +177,19 @@ export const updateProjeto = async (
   }
 
   if (patch.municipios !== undefined) {
-    await syncProjetoMunicipios(id, patch.municipios);
+    await syncProjetoMunicipios(id, (patch.municipios || []).map(trimText));
   }
 
+  const updatedPatch = { ...patch };
+  if (patch.nome !== undefined) updatedPatch.nome = trimText(patch.nome);
+  if (patch.contrato !== undefined) updatedPatch.contrato = trimText(patch.contrato).toUpperCase();
+  if (patch.financiador !== undefined) updatedPatch.financiador = trimText(patch.financiador);
+  if (patch.publicoCaract !== undefined) updatedPatch.publicoCaract = patch.publicoCaract ? trimText(patch.publicoCaract) : "";
+  if (patch.municipios !== undefined) updatedPatch.municipios = (patch.municipios || []).map(trimText);
+  if (patch.comunidadesAtendidas !== undefined) updatedPatch.comunidadesAtendidas = (patch.comunidadesAtendidas || []).map(trimText);
+
   projetos = projetos.map((p) =>
-    p.id === id ? { ...p, ...patch } : p
+    p.id === id ? { ...p, ...updatedPatch } : p
   );
   emit();
 };

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { trimText, toTitleCase } from "@/utils/sanitize";
 
 export interface Municipio {
   id: string;
@@ -104,6 +105,19 @@ function makeCrud<T extends { id: string }>(
         mutationFn: async (row: Partial<T> & { id?: string }) => {
           const payload = { ...row };
 
+          // Sanitize all string fields
+          for (const key of Object.keys(payload)) {
+            const val = (payload as any)[key];
+            if (typeof val === "string") {
+              // Apply toTitleCase for "nome" and "nome_responsavel" fields, trimText for others
+              if (key === "nome" || key === "nome_responsavel") {
+                (payload as any)[key] = toTitleCase(val);
+              } else if (key !== "id" && key !== "created_at" && key !== "updated_at") {
+                (payload as any)[key] = trimText(val);
+              }
+            }
+          }
+
           // Especial: para a tabela beneficiarios (Familias), manter documento_identificador sincronizado
           if (table === "beneficiarios") {
             const fam = payload as any;
@@ -192,9 +206,10 @@ export const LinhasAcao = {
     const qc = useQueryClient();
     return useMutation({
       mutationFn: async (nome: string) => {
+        const sanitizedNome = toTitleCase(nome);
         const { data, error } = await supabase
           .from("linhas_acao")
-          .insert({ nome })
+          .insert({ nome: sanitizedNome })
           .select("id, nome, ativo")
           .single();
         if (error) throw error;

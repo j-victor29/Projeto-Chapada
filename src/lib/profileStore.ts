@@ -1,5 +1,6 @@
 import { useSyncExternalStore, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { trimText, toTitleCase } from "@/utils/sanitize";
 
 export interface UserProfile {
   email: string;
@@ -60,8 +61,12 @@ export const fetchProfile = async (email: string) => {
 
 export const setProfile = async (email: string, data: Partial<UserProfile>) => {
   const key = email.toLowerCase();
+  const sanitizedData: Partial<UserProfile> = { ...data };
+  if (data.firstName !== undefined) sanitizedData.firstName = toTitleCase(data.firstName);
+  if (data.lastName !== undefined) sanitizedData.lastName = toTitleCase(data.lastName);
+
   const current = profiles[key] || { email: key, firstName: "", lastName: "" };
-  const updated = { ...current, ...data };
+  const updated = { ...current, ...sanitizedData };
   profiles = { ...profiles, [key]: updated };
   emit();
 

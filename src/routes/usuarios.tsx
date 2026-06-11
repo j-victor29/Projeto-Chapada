@@ -29,6 +29,7 @@ import { useGlobalSearch } from "@/contexts/SearchContext";
 import { addNotification } from "@/lib/notificationsStore";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile, fullName } from "@/lib/profileStore";
+import { trimText, toTitleCase } from "@/utils/sanitize";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -248,16 +249,29 @@ function UsuariosPage() {
     }
   };
 
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
   const handleSaveUsuario = async () => {
     if (!editingUsuario) return;
+    const errors: Record<string, string> = {};
     if (!editName.trim()) {
-      toast.error("O nome do usuário não pode ficar em branco.");
+      errors.name = "O nome do usuário não pode ficar em branco.";
+    }
+    if (!editCargo.trim()) {
+      errors.cargo = "O cargo não pode ficar em branco.";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      toast.error("Corrija os erros antes de salvar.");
       return;
     }
+
+    setFormErrors({});
     setSavingUsuario(true);
     try {
-      const trimmedName = editName.trim();
-      const trimmedCargo = editCargo.trim();
+      const trimmedName = toTitleCase(editName.trim());
+      const trimmedCargo = trimText(editCargo.trim());
 
       const { error } = await supabase
         .from("profiles")
@@ -472,7 +486,7 @@ function UsuariosPage() {
       {/* Dialog de edição de usuário */}
       <Dialog
         open={!!editingUsuario}
-        onOpenChange={(o) => !o && setEditingUsuario(null)}
+        onOpenChange={(o) => { if (!o) { setEditingUsuario(null); setFormErrors({}); } }}
       >
         <DialogContent className="max-w-md rounded-xl border border-muted bg-card/95 backdrop-blur-md shadow-2xl">
           <DialogHeader>
@@ -483,22 +497,26 @@ function UsuariosPage() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label htmlFor="edit-name">Nome Completo</Label>
+              <Label htmlFor="edit-name">Nome Completo *</Label>
               <Input
                 id="edit-name"
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
                 placeholder="Nome completo do usuário"
+                className={formErrors.name ? "border-red-500 focus-visible:ring-red-500" : ""}
               />
+              {formErrors.name && <p className="text-xs text-red-500">{formErrors.name}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="edit-cargo">Cargo</Label>
+              <Label htmlFor="edit-cargo">Cargo *</Label>
               <Input
                 id="edit-cargo"
                 value={editCargo}
                 onChange={(e) => setEditCargo(e.target.value)}
                 placeholder="Administrador"
+                className={formErrors.cargo ? "border-red-500 focus-visible:ring-red-500" : ""}
               />
+              {formErrors.cargo && <p className="text-xs text-red-500">{formErrors.cargo}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="edit-email">E-mail</Label>
@@ -513,7 +531,7 @@ function UsuariosPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingUsuario(null)}>
+            <Button variant="outline" onClick={() => { setEditingUsuario(null); setFormErrors({}); }}>
               Cancelar
             </Button>
             <Button onClick={handleSaveUsuario} className="gap-2" disabled={savingUsuario}>

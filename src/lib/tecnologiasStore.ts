@@ -1,5 +1,6 @@
 import { useSyncExternalStore, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { trimText, toTitleCase } from "@/utils/sanitize";
 
 export type CategoriaTec =
   | "hidrica"
@@ -256,10 +257,11 @@ export const fetchTecnologias = async () => {
 
 const getOrCreateCatalogTechId = async (nome: string, categoria: CategoriaTec): Promise<string | null> => {
   try {
+    const sanitizedNome = toTitleCase(nome);
     const { data } = await supabase
       .from("tecnologias")
       .select("id")
-      .eq("nome", nome)
+      .eq("nome", sanitizedNome)
       .maybeSingle();
 
     if (data) return data.id;
@@ -267,7 +269,7 @@ const getOrCreateCatalogTechId = async (nome: string, categoria: CategoriaTec): 
     const { data: newTech, error } = await supabase
       .from("tecnologias")
       .insert({
-        nome,
+        nome: sanitizedNome,
         linha_acao: CATEGORIAS[categoria]?.label || "Convivência com o Semiárido e Segurança Hídrica",
         ativo: true,
       })
@@ -303,12 +305,12 @@ export const addTecnologia = async (t: Omit<Tecnologia, "id">): Promise<string> 
       projeto_id: t.projetoId || null,
       tecnologia_id: techId,
       quantidade: t.quantidade,
-      unidade: t.unidade,
+      unidade: trimText(t.unidade),
       familias: t.familias || null,
-      municipios: t.municipios || null,
-      comunidades: t.comunidades || null,
+      municipios: t.municipios ? trimText(t.municipios) : null,
+      comunidades: t.comunidades ? trimText(t.comunidades) : null,
       data: t.data || null,
-      observacoes: t.observacoes || null,
+      observacoes: t.observacoes ? trimText(t.observacoes) : null,
     });
 
     if (error) {
@@ -341,12 +343,12 @@ export const updateTecnologia = async (id: string, t: Omit<Tecnologia, "id">): P
         projeto_id: t.projetoId || null,
         tecnologia_id: techId,
         quantidade: t.quantidade,
-        unidade: t.unidade,
+        unidade: trimText(t.unidade),
         familias: t.familias || null,
-        municipios: t.municipios || null,
-        comunidades: t.comunidades || null,
+        municipios: t.municipios ? trimText(t.municipios) : null,
+        comunidades: t.comunidades ? trimText(t.comunidades) : null,
         data: t.data || null,
-        observacoes: t.observacoes || null,
+        observacoes: t.observacoes ? trimText(t.observacoes) : null,
       })
       .eq("id", id);
 

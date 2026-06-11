@@ -68,12 +68,12 @@ function CadastrosPage() {
 
 function CrudShell({
   title, items, columns, renderForm, onSave, onDelete, getId, getRowValues, blank, canEdit, canDelete,
-  searchExternal, onSearchExternalChange, pagination,
+  searchExternal, onSearchExternalChange, pagination, validate,
 }: {
   title: string;
   items: any[] | undefined;
   columns: { label: string; key: string }[];
-  renderForm: (state: any, setState: (s: any) => void) => React.ReactNode;
+  renderForm: (state: any, setState: (s: any) => void, errors: Record<string, string>) => React.ReactNode;
   onSave: (s: any) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   getId: (row: any) => string;
@@ -89,12 +89,14 @@ function CrudShell({
     count: number;
     pageSize: number;
   };
+  validate?: (state: any) => Record<string, string>;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<any>(blank);
   const [localSearch, setLocalSearch] = useState("");
   const search = useDebounce(localSearch, 300);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const isPaginated = !!pagination;
 
@@ -136,7 +138,7 @@ function CrudShell({
               />
             </div>
             
-            <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setDraft(blank); }}>
+            <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setDraft(blank); setErrors({}); } }}>
               <DialogTrigger asChild>
                 <Button size="sm" className="gap-1 shadow-sm chapada-btn">
                   <Plus className="h-4 w-4" /> Novo
@@ -146,11 +148,20 @@ function CrudShell({
                 <DialogHeader>
                   <DialogTitle>{draft.id ? "Editar" : "Novo"} — {title}</DialogTitle>
                 </DialogHeader>
-                <div className="space-y-4 py-2">{renderForm(draft, setDraft)}</div>
+                <div className="space-y-4 py-2">{renderForm(draft, setDraft, errors)}</div>
                 <DialogFooter className="gap-2 sm:gap-0 mt-4">
                   <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
                   <Button
                     onClick={async () => {
+                      if (validate) {
+                        const validationErrors = validate(draft);
+                        if (Object.keys(validationErrors).length > 0) {
+                          setErrors(validationErrors);
+                          toast.error("Corrija os erros antes de salvar.");
+                          return;
+                        }
+                      }
+                      setErrors({});
                       try {
                         await onSave(draft);
                         toast.success("Registro salvo com sucesso!");
@@ -453,9 +464,16 @@ function MunicipiosTab() {
       getId={(r) => r.id}
       getRowValues={(r) => ({ ...r, microrregiao: r.microrregiao || r.regiao || "" })}
       blank={{ nome: "", uf: "", regiao: "", codigo_ibge: "", estado: "", microrregiao: "" }}
-      renderForm={(s, set) => (
+      renderForm={(s, set, errors) => (
         <IbgeMunicipiosSearch state={s} onChange={set} />
       )}
+      validate={(s) => {
+        const errors: Record<string, string> = {};
+        if (!s.codigo_ibge) {
+          errors.codigo_ibge = "Selecione um município da busca IBGE";
+        }
+        return errors;
+      }}
       onSave={(s) => upsert.mutateAsync(s)}
       onDelete={(id) => del.mutateAsync(id)}
     />
@@ -567,7 +585,7 @@ function ComunidadesTab() {
           count: totalCount,
           pageSize: 25,
         }}
-        renderForm={(s, set) => (
+        renderForm={(s, set, errors) => (
           <>
             <div className="space-y-1">
               <Label htmlFor="com-nome">Nome <span className="text-destructive">*</span></Label>
@@ -576,7 +594,9 @@ function ComunidadesTab() {
                 value={s.nome ?? ""} 
                 onChange={(e) => set({ ...s, nome: e.target.value })} 
                 placeholder="Ex: Vila Esperança"
+                className={errors.nome ? "border-red-500 focus-visible:ring-red-500" : ""}
               />
+              {errors.nome && <p className="text-xs text-red-500">{errors.nome}</p>}
             </div>
             <div className="space-y-1">
               <Label htmlFor="com-categoria">Categoria <span className="text-destructive">*</span></Label>
@@ -584,7 +604,7 @@ function ComunidadesTab() {
                 value={s.categoria || "Comunidade"} 
                 onValueChange={(v) => set({ ...s, categoria: v })}
               >
-                <SelectTrigger id="com-categoria">
+                <SelectTrigger id="com-categoria" className={errors.categoria ? "border-red-500" : ""}>
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -592,6 +612,7 @@ function ComunidadesTab() {
                   <SelectItem value="Local/Espaço">Local</SelectItem>
                 </SelectContent>
               </Select>
+              {errors.categoria && <p className="text-xs text-red-500">{errors.categoria}</p>}
             </div>
             <div className="space-y-1">
               <Label htmlFor="com-tipo">Tipo / Natureza (Opcional)</Label>
@@ -620,6 +641,16 @@ function ComunidadesTab() {
             </div>
           </>
         )}
+        validate={(s) => {
+          const errors: Record<string, string> = {};
+          if (!s.nome || !s.nome.trim()) {
+            errors.nome = "O nome é obrigatório";
+          }
+          if (!s.categoria) {
+            errors.categoria = "A categoria é obrigatória";
+          }
+          return errors;
+        }}
         onSave={async (s) => {
           if (!s.nome || !s.nome.trim()) {
             throw new Error("O nome é obrigatório.");
@@ -673,7 +704,7 @@ function TiposAcaoTab() {
       blank={{ nome: "", padrao: false, criado_via: "usuario" }}
       canEdit={(row) => !row.padrao}
       canDelete={(row) => !row.padrao}
-      renderForm={(s, set) => (
+      renderForm={(s, set, errors) => (
         <div className="space-y-1">
           <Label htmlFor="tipo-nome">Nome do Tipo <span className="text-destructive">*</span></Label>
           <Input
@@ -681,9 +712,18 @@ function TiposAcaoTab() {
             value={s.nome ?? ""}
             onChange={(e) => set({ ...s, nome: e.target.value })}
             placeholder="Ex: Webinar Técnico"
+            className={errors.nome ? "border-red-500 focus-visible:ring-red-500" : ""}
           />
+          {errors.nome && <p className="text-xs text-red-500">{errors.nome}</p>}
         </div>
       )}
+      validate={(s) => {
+        const errors: Record<string, string> = {};
+        if (!s.nome || !s.nome.trim()) {
+          errors.nome = "O nome é obrigatório";
+        }
+        return errors;
+      }}
       onSave={async (s) => {
         if (!s.nome || !s.nome.trim()) {
           throw new Error("O nome é obrigatório.");
@@ -767,19 +807,25 @@ function FinanciadoresTab() {
         count: totalCount,
         pageSize: 25,
       }}
-      renderForm={(s, set) => (
+      renderForm={(s, set, errors) => (
         <>
           <div className="space-y-1">
-            <Label htmlFor="fin-nome">Nome</Label>
-            <Input id="fin-nome" value={s.nome ?? ""} onChange={(e) => set({ ...s, nome: e.target.value })} />
+            <Label htmlFor="fin-nome">Nome <span className="text-destructive">*</span></Label>
+            <Input 
+              id="fin-nome" 
+              value={s.nome ?? ""} 
+              onChange={(e) => set({ ...s, nome: e.target.value })} 
+              className={errors.nome ? "border-red-500 focus-visible:ring-red-500" : ""}
+            />
+            {errors.nome && <p className="text-xs text-red-500">{errors.nome}</p>}
           </div>
           <div className="space-y-1">
-            <Label htmlFor="fin-tipo">Tipo</Label>
+            <Label htmlFor="fin-tipo">Tipo <span className="text-destructive">*</span></Label>
             <Select 
               value={s.tipo || undefined} 
               onValueChange={(v) => set({ ...s, tipo: v })}
             >
-              <SelectTrigger id="fin-tipo">
+              <SelectTrigger id="fin-tipo" className={errors.tipo ? "border-red-500" : ""}>
                 <SelectValue placeholder="Selecione um tipo..." />
               </SelectTrigger>
               <SelectContent>
@@ -788,6 +834,7 @@ function FinanciadoresTab() {
                 <SelectItem value="internacional">Internacional</SelectItem>
               </SelectContent>
             </Select>
+            {errors.tipo && <p className="text-xs text-red-500">{errors.tipo}</p>}
           </div>
           <div className="space-y-1">
             <Label htmlFor="fin-cnpj">CNPJ</Label>
@@ -803,6 +850,16 @@ function FinanciadoresTab() {
           </div>
         </>
       )}
+      validate={(s) => {
+        const errors: Record<string, string> = {};
+        if (!s.nome || !s.nome.trim()) {
+          errors.nome = "O nome é obrigatório";
+        }
+        if (!s.tipo) {
+          errors.tipo = "O tipo é obrigatório";
+        }
+        return errors;
+      }}
       onSave={(s) => upsert.mutateAsync(s)}
       onDelete={(id) => del.mutateAsync(id)}
     />
@@ -826,28 +883,36 @@ function CategoriasTab() {
       getId={(r) => r.id}
       getRowValues={(r) => r}
       blank={{ nome: "", tipo: "atividade", cor: "#1A9FD4", icone: "" }}
-      renderForm={(s, set) => (
+      renderForm={(s, set, errors) => (
         <>
           <div className="space-y-1">
-            <Label htmlFor="cat-nome">Nome</Label>
-            <Input id="cat-nome" value={s.nome ?? ""} onChange={(e) => set({ ...s, nome: e.target.value })} />
+            <Label htmlFor="cat-nome">Nome <span className="text-destructive">*</span></Label>
+            <Input 
+              id="cat-nome" 
+              value={s.nome ?? ""} 
+              onChange={(e) => set({ ...s, nome: e.target.value })} 
+              className={errors.nome ? "border-red-500 focus-visible:ring-red-500" : ""}
+            />
+            {errors.nome && <p className="text-xs text-red-500">{errors.nome}</p>}
           </div>
           <div className="space-y-1">
-            <Label htmlFor="cat-tipo">Tipo</Label>
+            <Label htmlFor="cat-tipo">Tipo <span className="text-destructive">*</span></Label>
             <Select 
               value={s.tipo || undefined} 
               onValueChange={(v) => set({ ...s, tipo: v })}
             >
-              <SelectTrigger id="cat-tipo">
+              <SelectTrigger id="cat-tipo" className={errors.tipo ? "border-red-500" : ""}>
                 <SelectValue placeholder="Selecione um tipo..." />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="atividade">Atividade</SelectItem>
                 <SelectItem value="tecnologia">Tecnologia</SelectItem>
                 <SelectItem value="documento">Documento</SelectItem>
+                <SelectItem value="imagem">Banco de Imagens</SelectItem>
                 <SelectItem value="geral">Geral</SelectItem>
               </SelectContent>
             </Select>
+            {errors.tipo && <p className="text-xs text-red-500">{errors.tipo}</p>}
           </div>
           <div className="space-y-1">
             <Label htmlFor="cat-cor">Cor (hex)</Label>
@@ -859,6 +924,16 @@ function CategoriasTab() {
           </div>
         </>
       )}
+      validate={(s) => {
+        const errors: Record<string, string> = {};
+        if (!s.nome || !s.nome.trim()) {
+          errors.nome = "O nome é obrigatório";
+        }
+        if (!s.tipo) {
+          errors.tipo = "O tipo é obrigatório";
+        }
+        return errors;
+      }}
       onSave={(s) => upsert.mutateAsync(s)}
       onDelete={(id) => del.mutateAsync(id)}
     />
@@ -881,11 +956,17 @@ function PublicosTab() {
       getId={(r) => r.id}
       getRowValues={(r) => r}
       blank={{ nome: "", descricao: "" }}
-      renderForm={(s, set) => (
+      renderForm={(s, set, errors) => (
         <>
           <div className="space-y-1">
-            <Label htmlFor="pub-nome">Nome</Label>
-            <Input id="pub-nome" value={s.nome ?? ""} onChange={(e) => set({ ...s, nome: e.target.value })} />
+            <Label htmlFor="pub-nome">Nome <span className="text-destructive">*</span></Label>
+            <Input 
+              id="pub-nome" 
+              value={s.nome ?? ""} 
+              onChange={(e) => set({ ...s, nome: e.target.value })} 
+              className={errors.nome ? "border-red-500 focus-visible:ring-red-500" : ""}
+            />
+            {errors.nome && <p className="text-xs text-red-500">{errors.nome}</p>}
           </div>
           <div className="space-y-1">
             <Label htmlFor="pub-desc">Descrição</Label>
@@ -893,6 +974,13 @@ function PublicosTab() {
           </div>
         </>
       )}
+      validate={(s) => {
+        const errors: Record<string, string> = {};
+        if (!s.nome || !s.nome.trim()) {
+          errors.nome = "O nome é obrigatório";
+        }
+        return errors;
+      }}
       onSave={(s) => upsert.mutateAsync(s)}
       onDelete={(id) => del.mutateAsync(id)}
     />
@@ -975,20 +1063,38 @@ function FamiliasTab() {
         count: totalCount,
         pageSize: 20,
       }}
-      renderForm={(s, set) => (
+      renderForm={(s, set, errors) => (
         <>
           <div className="space-y-1">
-            <Label htmlFor="fam-responsavel">Nome do Responsável</Label>
-            <Input id="fam-responsavel" value={s.nome_responsavel ?? ""} onChange={(e) => set({ ...s, nome_responsavel: e.target.value })} />
+            <Label htmlFor="fam-responsavel">Nome do Responsável <span className="text-destructive">*</span></Label>
+            <Input 
+              id="fam-responsavel" 
+              value={s.nome_responsavel ?? ""} 
+              onChange={(e) => set({ ...s, nome_responsavel: e.target.value })} 
+              className={errors.nome_responsavel ? "border-red-500 focus-visible:ring-red-500" : ""}
+            />
+            {errors.nome_responsavel && <p className="text-xs text-red-500">{errors.nome_responsavel}</p>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label htmlFor="fam-cpf">CPF</Label>
-              <Input id="fam-cpf" value={s.cpf ?? ""} onChange={(e) => set({ ...s, cpf: e.target.value })} />
+              <Input 
+                id="fam-cpf" 
+                value={s.cpf ?? ""} 
+                onChange={(e) => set({ ...s, cpf: e.target.value })} 
+                className={errors.cpf ? "border-red-500 focus-visible:ring-red-500" : ""}
+              />
+              {errors.cpf && <p className="text-xs text-red-500">{errors.cpf}</p>}
             </div>
             <div className="space-y-1">
               <Label htmlFor="fam-nis">NIS</Label>
-              <Input id="fam-nis" value={s.nis ?? ""} onChange={(e) => set({ ...s, nis: e.target.value })} />
+              <Input 
+                id="fam-nis" 
+                value={s.nis ?? ""} 
+                onChange={(e) => set({ ...s, nis: e.target.value })} 
+                className={errors.nis ? "border-red-500 focus-visible:ring-red-500" : ""}
+              />
+              {errors.nis && <p className="text-xs text-red-500">{errors.nis}</p>}
             </div>
           </div>
           <div className="space-y-1">
@@ -1046,6 +1152,19 @@ function FamiliasTab() {
           </div>
         </>
       )}
+      validate={(s) => {
+        const errors: Record<string, string> = {};
+        if (!s.nome_responsavel || !s.nome_responsavel.trim()) {
+          errors.nome_responsavel = "O nome do responsável é obrigatório";
+        }
+        if (s.cpf && s.cpf.trim() && !/^\d{11}$/.test(s.cpf.replace(/[.-]/g, ""))) {
+          errors.cpf = "CPF deve ter 11 dígitos numéricos";
+        }
+        if (s.nis && s.nis.trim() && !/^\d{11}$/.test(s.nis.replace(/[.-]/g, ""))) {
+          errors.nis = "NIS deve ter 11 dígitos numéricos";
+        }
+        return errors;
+      }}
       onSave={(s) => upsert.mutateAsync(s)}
       onDelete={(id) => del.mutateAsync(id)}
     />
@@ -1073,10 +1192,11 @@ function TecnologiasTab() {
   const [showInativos, setShowInativos] = useState(false);
   const [novaLinha, setNovaLinha] = useState("");
   const [criandoLinha, setCriandoLinha] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const search = useDebounce(localSearch, 300);
 
-  const openCreate = () => { setDraft(BLANK_TECH); setNovaLinha(""); setCriandoLinha(false); setOpen(true); };
-  const openEdit = (row: any) => { setDraft({ ...row }); setNovaLinha(""); setCriandoLinha(false); setOpen(true); };
+  const openCreate = () => { setDraft(BLANK_TECH); setNovaLinha(""); setCriandoLinha(false); setErrors({}); setOpen(true); };
+  const openEdit = (row: any) => { setDraft({ ...row }); setNovaLinha(""); setCriandoLinha(false); setErrors({}); setOpen(true); };
 
   const linhasUnicas = useMemo(() => {
     const fromItems = [...new Set((items ?? []).map((t: any) => t.linha_acao).filter(Boolean))];
@@ -1098,28 +1218,37 @@ function TecnologiasTab() {
   }, [items, search, linhaFiltro, showInativos]);
 
   const handleSave = async () => {
-    try {
-      let linhaFinal = draft.linha_acao;
+    const validationErrors: Record<string, string> = {};
+    let linhaFinal = draft.linha_acao;
 
-      // Se está criando uma nova linha de ação
-      if (draft.linha_acao === "__nova__") {
-        if (!novaLinha.trim()) {
-          toast.error("Digite o nome da nova Linha de Ação.");
-          return;
+    if (draft.linha_acao === "__nova__") {
+      if (!novaLinha.trim()) {
+        validationErrors.linha_acao = "Digite o nome da nova Linha de Ação.";
+      } else {
+        try {
+          const created = await createLinha.mutateAsync(novaLinha.trim());
+          linhaFinal = created.nome;
+        } catch (e: any) {
+          validationErrors.linha_acao = e.message || "Erro ao criar Linha de Ação";
         }
-        const created = await createLinha.mutateAsync(novaLinha.trim());
-        linhaFinal = created.nome;
       }
+    }
 
-      if (!draft.nome?.trim()) {
-        toast.error("O nome da tecnologia é obrigatório.");
-        return;
-      }
-      if (!linhaFinal?.trim()) {
-        toast.error("Selecione ou crie uma Linha de Ação.");
-        return;
-      }
+    if (!draft.nome?.trim()) {
+      validationErrors.nome = "O nome da tecnologia é obrigatório.";
+    }
+    if (!linhaFinal?.trim()) {
+      validationErrors.linha_acao = "Selecione ou crie uma Linha de Ação.";
+    }
 
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      toast.error("Corrija os erros antes de salvar.");
+      return;
+    }
+
+    setErrors({});
+    try {
       await upsert.mutateAsync({ ...draft, linha_acao: linhaFinal });
       toast.success("Tecnologia salva com sucesso!");
       setOpen(false);
@@ -1177,7 +1306,7 @@ function TecnologiasTab() {
             </button>
 
             {/* Botão Novo */}
-            <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setDraft(BLANK_TECH); setNovaLinha(""); setCriandoLinha(false); } }}>
+            <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setDraft(BLANK_TECH); setNovaLinha(""); setCriandoLinha(false); setErrors({}); } }}>
               <DialogTrigger asChild>
                 <Button size="sm" className="gap-1 shadow-sm" onClick={openCreate}>
                   <Plus className="h-4 w-4" /> Novo
@@ -1197,7 +1326,9 @@ function TecnologiasTab() {
                       value={draft.nome ?? ""}
                       placeholder="Ex.: Cisterna de consumo humano"
                       onChange={(e) => setDraft({ ...draft, nome: e.target.value })}
+                      className={errors.nome ? "border-red-500 focus-visible:ring-red-500" : ""}
                     />
+                    {errors.nome && <p className="text-xs text-red-500">{errors.nome}</p>}
                   </div>
 
                   {/* Linha de Ação */}
@@ -1211,7 +1342,7 @@ function TecnologiasTab() {
                         if (v !== "__nova__") setNovaLinha("");
                       }}
                     >
-                      <SelectTrigger id="tech-linha">
+                      <SelectTrigger id="tech-linha" className={errors.linha_acao ? "border-red-500" : ""}>
                         <SelectValue placeholder="Selecione a linha de ação..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -1221,6 +1352,7 @@ function TecnologiasTab() {
                         <SelectItem value="__nova__">➕ Criar nova linha de ação</SelectItem>
                       </SelectContent>
                     </Select>
+                    {errors.linha_acao && <p className="text-xs text-red-500">{errors.linha_acao}</p>}
                   </div>
 
                   {/* Campo inline para nova linha de ação */}
@@ -1232,6 +1364,7 @@ function TecnologiasTab() {
                         value={novaLinha}
                         placeholder="Ex.: Educação Ambiental"
                         onChange={(e) => setNovaLinha(e.target.value)}
+                        className={errors.linha_acao ? "border-red-500 focus-visible:ring-red-500" : ""}
                         autoFocus
                       />
                       <p className="text-xs text-muted-foreground">Essa categoria será criada e ficará disponível para futuras tecnologias.</p>

@@ -1,5 +1,6 @@
 import { useSyncExternalStore, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { trimText } from "@/utils/sanitize";
 
 export interface AtividadeIndicadores {
   participantes?: number;
@@ -104,6 +105,32 @@ const getOrCreateAtividadesCategoria = async (): Promise<string> => {
   return newCat.id;
 };
 
+const getOrCreateAcoesIndependentesCategoria = async (): Promise<string> => {
+  const { data: cat, error } = await supabase
+    .from("categorias")
+    .select("id")
+    .eq("nome", "Ações Independentes")
+    .maybeSingle();
+
+  if (cat) return cat.id;
+
+  const { data: newCat, error: insertError } = await supabase
+    .from("categorias")
+    .insert({
+      nome: "Ações Independentes",
+      tipo: "geral"
+    })
+    .select("id")
+    .single();
+
+  if (insertError || !newCat) {
+    console.error("Erro ao criar categoria Ações Independentes:", insertError);
+    throw insertError ?? new Error("Erro ao criar categoria Ações Independentes.");
+  }
+
+  return newCat.id;
+};
+
 export const processAnexosAtividade = async (
   atividadeId: string,
   projetoId: string | null,
@@ -148,7 +175,10 @@ export const processAnexosAtividade = async (
   const novosAnexos = anexosForm.filter(a => a.dataUrl && a.dataUrl.startsWith("data:"));
   if (novosAnexos.length === 0) return;
 
-  const categoriaId = await getOrCreateAtividadesCategoria();
+  const isIndependent = !projetoId;
+  const categoriaId = isIndependent 
+    ? await getOrCreateAcoesIndependentesCategoria()
+    : await getOrCreateAtividadesCategoria();
   const { data: userData } = await supabase.auth.getUser();
   const uid = userData.user?.id;
 
@@ -197,7 +227,9 @@ export const processAnexosAtividade = async (
           .from("documentos")
           .insert({
             titulo: file.name,
-            descricao: `Anexo da Atividade: ${atividadeId}`,
+            descricao: isIndependent 
+              ? `Anexo da Ação Independente: ${atividadeId}` 
+              : `Anexo da Atividade: ${atividadeId}`,
             categoria_id: categoriaId,
             projeto_id: projetoId || null,
             storage_path: path,
@@ -316,13 +348,13 @@ export const addAtividade = async (
     .from("atividades")
     .insert({
       projeto_id: a.projetoId || null,
-      titulo: a.titulo || null,
+      titulo: a.titulo ? trimText(a.titulo) : null,
       data: a.data,
-      tipo: a.tipo,
-      descricao: a.descricao,
-      local: a.local || null,
-      municipio: a.municipio || null,
-      responsaveis: a.responsaveis || null,
+      tipo: a.tipo ? trimText(a.tipo) : a.tipo,
+      descricao: trimText(a.descricao),
+      local: a.local ? trimText(a.local) : null,
+      municipio: a.municipio ? trimText(a.municipio) : null,
+      responsaveis: a.responsaveis ? trimText(a.responsaveis) : null,
       indicadores: a.indicadores || null,
       anexos: null,
     })
@@ -361,14 +393,14 @@ export const updateAtividade = async (
 ) => {
   const updatePayload: Record<string, unknown> = {};
   if (patch.projetoId !== undefined) updatePayload.projeto_id = patch.projetoId || null;
-  if (patch.titulo !== undefined) updatePayload.titulo = patch.titulo || null;
+  if (patch.titulo !== undefined) updatePayload.titulo = patch.titulo ? trimText(patch.titulo) : null;
   if (patch.data !== undefined) updatePayload.data = patch.data;
-  if (patch.tipo !== undefined) updatePayload.tipo = patch.tipo;
-  if (patch.descricao !== undefined) updatePayload.descricao = patch.descricao;
-  if (patch.local !== undefined) updatePayload.local = patch.local;
-  if (patch.municipio !== undefined) updatePayload.municipio = patch.municipio;
+  if (patch.tipo !== undefined) updatePayload.tipo = patch.tipo ? trimText(patch.tipo) : patch.tipo;
+  if (patch.descricao !== undefined) updatePayload.descricao = trimText(patch.descricao);
+  if (patch.local !== undefined) updatePayload.local = patch.local ? trimText(patch.local) : null;
+  if (patch.municipio !== undefined) updatePayload.municipio = patch.municipio ? trimText(patch.municipio) : null;
   if (patch.responsaveis !== undefined)
-    updatePayload.responsaveis = patch.responsaveis;
+    updatePayload.responsaveis = patch.responsaveis ? trimText(patch.responsaveis) : null;
   if (patch.indicadores !== undefined)
     updatePayload.indicadores = patch.indicadores || null;
 

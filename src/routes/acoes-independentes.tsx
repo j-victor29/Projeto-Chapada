@@ -82,6 +82,7 @@ import {
 } from "@/lib/autocompleteHooks";
 import { TipoAcaoSelect } from "@/components/TipoAcaoSelect";
 import { LocalComunidadeSelect } from "@/components/LocalComunidadeSelect";
+import { useFormValidation } from "@/hooks/useFormValidation";
 
 export const Route = createFileRoute("/acoes-independentes")({
   component: AcoesIndependentesPage,
@@ -171,13 +172,37 @@ function AcoesIndependentesPage() {
   };
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
+
+  // Validation rules using useFormValidation (excluding projetoId)
+  const validationRules = useMemo(() => ({
+    required: ["titulo", "data", "tipo", "descricao", "municipio", "local"],
+    minChars: {
+      titulo: { min: 3, message: "O título deve ter pelo menos 3 caracteres" },
+      descricao: { min: 3, message: "A descrição deve ter pelo menos 3 caracteres" },
+    },
+    custom: [
+      (values: any, errors: Record<string, string>) => {
+        if (values.data) {
+          const dataAcao = new Date(values.data);
+          const umAnoFuturo = new Date();
+          umAnoFuturo.setFullYear(umAnoFuturo.getFullYear() + 1);
+          if (dataAcao > umAnoFuturo) {
+            errors.data = "A data não pode ser superior a 1 ano no futuro";
+          }
+        }
+      }
+    ]
+  }), []);
+
+  const { isValid, errors: validationErrors } = useFormValidation(form, validationRules);
   const [anexos, setAnexos] = useState<Anexo[]>([]);
   const [toDelete, setToDelete] = useState<AtividadeFull | null>(null);
   const [localType, setLocalType] = useState<"comunidade" | "local" | null>(null);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const { email: currentEmail, name: currentName } = useCurrentUser();
   const editingOwnership = useOwnership("atividade", editingId ?? "");
 
@@ -350,6 +375,7 @@ function AcoesIndependentesPage() {
     setAnexos([]);
     setMunicipioInput("");
     setLocalType(null);
+    setFormErrors({});
     setOpen(true);
   };
 
@@ -363,14 +389,17 @@ function AcoesIndependentesPage() {
     setAnexos(a.anexos ?? []);
     setMunicipioInput("");
     setLocalType(null);
+    setFormErrors({});
     setOpen(true);
   };
 
   const handleSave = async () => {
-    if (!form.titulo || !form.data || !form.tipo || !form.descricao) {
-      toast.error("Preencha Título da Ação, Data, Tipo de Ação e Descrição.");
+    if (!isValid) {
+      setFormErrors(validationErrors);
+      toast.error("Corrija os erros antes de salvar.");
       return;
     }
+    setFormErrors({});
     const payload = {
       projetoId: "", // Always empty/null for independent actions
       titulo: form.titulo,
@@ -715,7 +744,9 @@ function AcoesIndependentesPage() {
                 value={form.titulo}
                 onChange={(e) => setF("titulo")(e.target.value)}
                 placeholder="Ex: Oficina de Agroecologia"
+                className={formErrors.titulo ? "border-red-500 focus-visible:ring-red-500" : ""}
               />
+              {formErrors.titulo && <p className="text-xs text-red-500 mt-1">{formErrors.titulo}</p>}
             </div>
             <div>
               <Label>Data da Atividade *</Label>
@@ -723,20 +754,24 @@ function AcoesIndependentesPage() {
                 type="date"
                 value={form.data}
                 onChange={(e) => setF("data")(e.target.value)}
+                className={formErrors.data ? "border-red-500 focus-visible:ring-red-500" : ""}
               />
+              {formErrors.data && <p className="text-xs text-red-500 mt-1">{formErrors.data}</p>}
             </div>
             <div>
               <Label>Tipo de Ação *</Label>
               <TipoAcaoSelect
                 value={form.tipo}
-                onValueChange={setF("tipo")}
+                onValueChange={(v) => { setF("tipo")(v); if (formErrors.tipo) setFormErrors(p => ({ ...p, tipo: "" })); }}
                 disabled={saving}
+                className={formErrors.tipo ? "border-red-500" : ""}
               />
+              {formErrors.tipo && <p className="text-xs text-red-500 mt-1">{formErrors.tipo}</p>}
             </div>
 
             {/* ── MUNICÍPIO — Autocomplete IBGE ───────────────────────────── */}
             <div>
-              <Label>Município</Label>
+              <Label>Município *</Label>
               {form.municipio ? (
                 <div className="flex items-center gap-2 mt-2">
                   <Badge variant="secondary" className="gap-1 px-2.5 py-1 text-xs font-medium">
@@ -814,18 +849,20 @@ function AcoesIndependentesPage() {
                   )}
                 </div>
               )}
+              {formErrors.municipio && <p className="text-xs text-red-500 mt-1">{formErrors.municipio}</p>}
             </div>
 
             {/* ── LOCAL / COMUNIDADE — Autocomplete unificado ────────────────── */}
             <div>
-              <Label>Local / Comunidade</Label>
+              <Label>Local / Comunidade *</Label>
               <LocalComunidadeSelect
                 value={form.local}
-                onValueChange={setF("local")}
+                onValueChange={(v) => { setF("local")(v); if (formErrors.local) setFormErrors(p => ({ ...p, local: "" })); }}
                 localType={localType}
                 onLocalTypeChange={setLocalType}
                 disabled={saving}
               />
+              {formErrors.local && <p className="text-xs text-red-500 mt-1">{formErrors.local}</p>}
             </div>
 
             <div className="md:col-span-2">
@@ -834,7 +871,9 @@ function AcoesIndependentesPage() {
                 rows={3}
                 value={form.descricao}
                 onChange={(e) => setF("descricao")(e.target.value)}
+                className={formErrors.descricao ? "border-red-500 focus-visible:ring-red-500" : ""}
               />
+              {formErrors.descricao && <p className="text-xs text-red-500 mt-1">{formErrors.descricao}</p>}
             </div>
             <div className="md:col-span-2">
               <Label>Responsáveis</Label>

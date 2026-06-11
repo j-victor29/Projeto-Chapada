@@ -154,26 +154,58 @@ function DocumentosPage() {
   const [busca, setBusca] = useState("");
   const [filtroCategoria, setFiltroCategoria] = useState("todos");
   const [filtroProjeto, setFiltroProjeto] = useState("todos");
+  const [filtroAtividade, setFiltroAtividade] = useState("todos");
+  const [filtroAcaoIndependente, setFiltroAcaoIndependente] = useState("todos");
   const [dataDe, setDataDe] = useState("");
   const [dataAte, setDataAte] = useState("");
   const [page, setPage] = useState(0);
 
   const isPeriodInvalid = !!(dataDe && dataAte && dataDe > dataAte);
 
+  const { data: atividadesWithDocs = [] } = useQuery({
+    queryKey: ["atividades-with-docs"],
+    enabled: !!session,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("arquivos_midia")
+        .select("atividade:atividades(id, titulo, descricao, projeto_id, data)")
+        .eq("tipo_arquivo", "documento");
+      if (error) throw error;
+      
+      const seen = new Set<string>();
+      const list: any[] = [];
+      for (const item of data ?? []) {
+        const at = item.atividade as any;
+        if (at && !seen.has(at.id)) {
+          seen.add(at.id);
+          list.push(at);
+        }
+      }
+      return list.sort((a, b) => (b.data || "").localeCompare(a.data || ""));
+    }
+  });
+
+  const atividadesComProjeto = useMemo(() => atividadesWithDocs.filter(at => at.projeto_id), [atividadesWithDocs]);
+  const acoesIndependentes = useMemo(() => atividadesWithDocs.filter(at => !at.projeto_id), [atividadesWithDocs]);
+
   const hasActiveFilters = useMemo(() => {
     return (
       busca !== "" ||
       filtroCategoria !== "todos" ||
       filtroProjeto !== "todos" ||
+      filtroAtividade !== "todos" ||
+      filtroAcaoIndependente !== "todos" ||
       dataDe !== "" ||
       dataAte !== ""
     );
-  }, [busca, filtroCategoria, filtroProjeto, dataDe, dataAte]);
+  }, [busca, filtroCategoria, filtroProjeto, filtroAtividade, filtroAcaoIndependente, dataDe, dataAte]);
 
   const clearFilters = () => {
     setBusca("");
     setFiltroCategoria("todos");
     setFiltroProjeto("todos");
+    setFiltroAtividade("todos");
+    setFiltroAcaoIndependente("todos");
     setDataDe("");
     setDataAte("");
     setPage(0);
@@ -181,7 +213,7 @@ function DocumentosPage() {
 
   // Query paginada: busca documentos raiz com filtros aplicados no servidor
   const { data: pagedResult, isLoading } = useQuery({
-    queryKey: ["documentos-paginated", page, busca, filtroCategoria, filtroProjeto, dataDe, dataAte],
+    queryKey: ["documentos-paginated", page, busca, filtroCategoria, filtroProjeto, dataDe, dataAte, filtroAtividade, filtroAcaoIndependente],
     enabled: !!session,
     queryFn: async () => {
       let q = supabase
@@ -201,6 +233,12 @@ function DocumentosPage() {
       }
       if (filtroProjeto !== "todos") {
         q = q.eq("projeto_id", filtroProjeto);
+      }
+      if (filtroAtividade !== "todos") {
+        q = q.ilike("descricao", `%${filtroAtividade}%`);
+      }
+      if (filtroAcaoIndependente !== "todos") {
+        q = q.ilike("descricao", `%${filtroAcaoIndependente}%`);
       }
       if (dataDe) {
         q = q.gte("created_at", dataDe);
@@ -489,7 +527,7 @@ function DocumentosPage() {
                   <Button variant="outline" size="sm" className="h-9 gap-2">
                     <Filter className="h-4 w-4" />
                     Filtros Avançados
-                    {(filtroCategoria !== "todos" || filtroProjeto !== "todos") && (
+                    {(filtroCategoria !== "todos" || filtroProjeto !== "todos" || filtroAtividade !== "todos" || filtroAcaoIndependente !== "todos") && (
                       <Badge variant="secondary" className="ml-1 rounded-sm px-1.5 py-0 text-[10px]">
                         Ativo
                       </Badge>
@@ -527,6 +565,46 @@ function DocumentosPage() {
                             {p.nome}
                           </SelectItem>
                         ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Atividade</Label>
+                    <Select value={filtroAtividade} onValueChange={setFiltroAtividade}>
+                      <SelectTrigger className="h-9 text-xs bg-background/50">
+                        <SelectValue placeholder="Todas" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60 rounded-lg shadow-lg border">
+                        <SelectItem value="todos" className="text-xs">Todas</SelectItem>
+                        {atividadesComProjeto.map((at) => {
+                          const label = `${at.titulo || at.descricao?.slice(0, 30) || "Sem título"} (${safeFormatDate(at.data)})`;
+                          return (
+                            <SelectItem key={at.id} value={at.id} className="text-xs">
+                              {label}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Ação Independente</Label>
+                    <Select value={filtroAcaoIndependente} onValueChange={setFiltroAcaoIndependente}>
+                      <SelectTrigger className="h-9 text-xs bg-background/50">
+                        <SelectValue placeholder="Todas" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60 rounded-lg shadow-lg border">
+                        <SelectItem value="todos" className="text-xs">Todas</SelectItem>
+                        {acoesIndependentes.map((at) => {
+                          const label = `${at.titulo || at.descricao?.slice(0, 30) || "Sem título"} (${safeFormatDate(at.data)})`;
+                          return (
+                            <SelectItem key={at.id} value={at.id} className="text-xs">
+                              {label}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>

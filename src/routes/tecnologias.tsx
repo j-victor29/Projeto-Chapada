@@ -63,6 +63,7 @@ import { addNotification } from "@/lib/notificationsStore";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { trimText } from "@/utils/sanitize";
 
 export const Route = createFileRoute("/tecnologias")({
   component: TecnologiasPage,
@@ -887,6 +888,7 @@ function TecnologiaModal({
   const [projetoId, setProjetoId] = useState<string>("");
   const [data, setData] = useState(new Date().toISOString().slice(0, 10));
   const [observacoes, setObservacoes] = useState("");
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const editingOwnership = useOwnership("tecnologia", editing?.id ?? "");
 
   // Linhas de ação disponíveis no catálogo
@@ -959,22 +961,20 @@ function TecnologiaModal({
   };
 
   const submit = async () => {
-    if (!tecnologiaId) {
-      toast.error("Por favor, selecione uma tecnologia do catálogo oficial.");
+    const errors: Record<string, string> = {};
+    if (!linhaAcao) errors.linhaAcao = "A categoria é obrigatória";
+    if (!tecnologiaId) errors.tecnologiaId = "Selecione uma tecnologia do catálogo";
+    if (!quantidade || Number(quantidade) <= 0) errors.quantidade = "Informe uma quantidade válida (maior que 0)";
+    if (!projetoId) errors.projetoId = "O projeto vinculado é obrigatório";
+    if (!trimText(municipios)) errors.municipios = "Informe os municípios atendidos";
+    if (!data) errors.data = "A data de implementação é obrigatória";
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      toast.error("Corrija os erros antes de salvar.");
       return;
     }
-    if (!quantidade || Number(quantidade) <= 0) {
-      toast.error("Por favor, insira uma quantidade válida superior a 0.");
-      return;
-    }
-    if (!projetoId) {
-      toast.error("O campo 'Projeto vinculado' é obrigatório.");
-      return;
-    }
-    if (!municipios.trim()) {
-      toast.error("Por favor, informe os municípios atendidos.");
-      return;
-    }
+    setFormErrors({});
 
     try {
       const selectedTech = catalogo.find((t) => t.id === tecnologiaId);
@@ -1074,8 +1074,8 @@ function TecnologiaModal({
             <Label className="text-sm font-medium">
               Categoria <span className="text-destructive">*</span>
             </Label>
-            <Select value={linhaAcao} onValueChange={handleLinhaChange}>
-              <SelectTrigger className="h-10">
+            <Select value={linhaAcao} onValueChange={(v) => { handleLinhaChange(v); if (formErrors.linhaAcao) setFormErrors(p => ({ ...p, linhaAcao: "" })); }}>
+              <SelectTrigger className={`h-10 ${formErrors.linhaAcao ? "border-red-500" : ""}`}>
                 <SelectValue placeholder="Selecione a linha de ação..." />
               </SelectTrigger>
               <SelectContent>
@@ -1092,6 +1092,7 @@ function TecnologiaModal({
                 })}
               </SelectContent>
             </Select>
+            {formErrors.linhaAcao && <p className="text-xs text-red-500 mt-1">{formErrors.linhaAcao}</p>}
           </div>
 
           {/* Campo 2 — Nome da Tecnologia (filtrado pela categoria) */}
@@ -1101,10 +1102,10 @@ function TecnologiaModal({
             </Label>
             <Select
               value={tecnologiaId}
-              onValueChange={setTecnologiaId}
+              onValueChange={(v) => { setTecnologiaId(v); if (formErrors.tecnologiaId) setFormErrors(p => ({ ...p, tecnologiaId: "" })); }}
               disabled={!linhaAcao}
             >
-              <SelectTrigger className="h-10">
+              <SelectTrigger className={`h-10 ${formErrors.tecnologiaId ? "border-red-500" : ""}`}>
                 <SelectValue
                   placeholder={
                     linhaAcao
@@ -1121,6 +1122,7 @@ function TecnologiaModal({
                 ))}
               </SelectContent>
             </Select>
+            {formErrors.tecnologiaId && <p className="text-xs text-red-500 mt-1">{formErrors.tecnologiaId}</p>}
           </div>
 
           {/* Campo 3 — Quantidade + Unidade (mesma linha) */}
@@ -1136,7 +1138,9 @@ function TecnologiaModal({
                 onChange={(v) =>
                   setQuantidade(v !== undefined ? String(v) : "")
                 }
+                className={formErrors.quantidade ? "border-red-500" : ""}
               />
+              {formErrors.quantidade && <p className="text-xs text-red-500 mt-1">{formErrors.quantidade}</p>}
             </div>
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">
@@ -1164,9 +1168,11 @@ function TecnologiaModal({
             </Label>
             <Input
               value={municipios}
-              onChange={(e) => setMunicipios(e.target.value)}
+              onChange={(e) => { setMunicipios(e.target.value); if (formErrors.municipios) setFormErrors(p => ({ ...p, municipios: "" })); }}
               placeholder="Ex: Araripina, Ouricuri, Bodocó"
+              className={formErrors.municipios ? "border-red-500 focus-visible:ring-red-500" : ""}
             />
+            {formErrors.municipios && <p className="text-xs text-red-500 mt-1">{formErrors.municipios}</p>}
           </div>
 
           {/* Campo 5 — Comunidades */}
@@ -1185,8 +1191,11 @@ function TecnologiaModal({
               <Label className="text-sm font-medium">
                 Projeto vinculado <span className="text-destructive">*</span>
               </Label>
-              <Select value={projetoId} onValueChange={setProjetoId}>
-                <SelectTrigger className="h-10">
+              <Select
+                value={projetoId}
+                onValueChange={(v) => { setProjetoId(v); if (formErrors.projetoId) setFormErrors(p => ({ ...p, projetoId: "" })); }}
+              >
+                <SelectTrigger className={`h-10 ${formErrors.projetoId ? "border-red-500" : ""}`}>
                   <SelectValue placeholder="Selecione o projeto" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1205,6 +1214,7 @@ function TecnologiaModal({
                   )}
                 </SelectContent>
               </Select>
+              {formErrors.projetoId && <p className="text-xs text-red-500 mt-1">{formErrors.projetoId}</p>}
             </div>
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">
@@ -1214,9 +1224,10 @@ function TecnologiaModal({
               <Input
                 type="date"
                 value={data}
-                onChange={(e) => setData(e.target.value)}
-                className="h-10"
+                onChange={(e) => { setData(e.target.value); if (formErrors.data) setFormErrors(p => ({ ...p, data: "" })); }}
+                className={`h-10 ${formErrors.data ? "border-red-500" : ""}`}
               />
+              {formErrors.data && <p className="text-xs text-red-500 mt-1">{formErrors.data}</p>}
             </div>
           </div>
 
