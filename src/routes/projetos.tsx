@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, lazy, Suspense, useRef, useEffect, useCallback } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PaginationControls } from "@/components/PaginationControls";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -130,6 +131,8 @@ function toTitleCase(str: string): string {
 
 
 
+const PAGE_SIZE = 20;
+
 function ProjetosPage() {
   const projetos = useProjetos();
   const { data: dbFinanciadores = [] } = Financiadores.useList();
@@ -144,6 +147,7 @@ function ProjetosPage() {
   const [fFin, setFFin] = useState<string>("todos");
   const [fMun, setFMun] = useState<string>("todos");
   const [fStatus, setFStatus] = useState<string>("todos");
+  const [page, setPage] = useState(0);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<EditingState>(emptyProjeto);
@@ -430,6 +434,27 @@ function ProjetosPage() {
       return true;
     });
   }, [projetos, search, globalQuery, fFin, fMun, fStatus]);
+
+  // Resetar página ao mudar filtros
+  const prevFilters = useRef({ search, globalQuery, fFin, fMun, fStatus });
+  useEffect(() => {
+    const prev = prevFilters.current;
+    if (
+      prev.search !== search ||
+      prev.globalQuery !== globalQuery ||
+      prev.fFin !== fFin ||
+      prev.fMun !== fMun ||
+      prev.fStatus !== fStatus
+    ) {
+      setPage(0);
+      prevFilters.current = { search, globalQuery, fFin, fMun, fStatus };
+    }
+  }, [search, globalQuery, fFin, fMun, fStatus]);
+
+  const paginatedFiltered = useMemo(
+    () => filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
+    [filtered, page]
+  );
 
   const openNew = () => {
     setEditing({ ...emptyProjeto });
@@ -962,7 +987,7 @@ function ProjetosPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.length === 0 ? (
+              {paginatedFiltered.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
                     {projetos.length === 0
@@ -971,7 +996,7 @@ function ProjetosPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((p) => (
+                paginatedFiltered.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell>
                       <div className="font-medium">{p.nome}</div>
@@ -1079,6 +1104,15 @@ function ProjetosPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {filtered.length > PAGE_SIZE && (
+        <PaginationControls
+          page={page}
+          setPage={setPage}
+          count={filtered.length}
+          pageSize={PAGE_SIZE}
+        />
+      )}
     </AppLayout>
   );
 }

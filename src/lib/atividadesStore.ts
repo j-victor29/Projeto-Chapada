@@ -24,6 +24,7 @@ export interface AtividadeFull {
   anexos?: { nome: string; dataUrl: string }[];
   indicadores?: AtividadeIndicadores;
   editado?: boolean;
+  arquivosMidia?: any[];
 }
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -58,9 +59,199 @@ const emitIndependentes = () => listenersIndependentes.forEach((l) => l());
 const sortDesc = (arr: AtividadeFull[]) =>
   [...arr].sort((x, y) => y.data.localeCompare(x.data));
 
+// ─── Auxiliares para Upload de Anexos ──────────────────────────────────────────
+
+const dataURLtoFile = (dataurl: string, filename: string): File => {
+  const arr = dataurl.split(',');
+  const mime = arr[0].match(/:(.*?);/)?.[1] ?? '';
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new File([u8arr], filename, { type: mime });
+};
+
+const isImageFile = (file: File): boolean => {
+  return file.type.startsWith('image/') || 
+         /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(file.name);
+};
+
+const getOrCreateAtividadesCategoria = async (): Promise<string> => {
+  const { data: cat, error } = await supabase
+    .from("categorias")
+    .select("id")
+    .eq("nome", "Atividades")
+    .maybeSingle();
+
+  if (cat) return cat.id;
+
+  const { data: newCat, error: insertError } = await supabase
+    .from("categorias")
+    .insert({
+      nome: "Atividades",
+      tipo: "geral"
+    })
+    .select("id")
+    .single();
+
+  if (insertError || !newCat) {
+    console.error("Erro ao criar categoria Atividades:", insertError);
+    throw insertError ?? new Error("Erro ao criar categoria Atividades.");
+  }
+
+  return newCat.id;
+};
+
+export const processAnexosAtividade = async (
+  atividadeId: string,
+  projetoId: string | null,
+  anexosForm: any[],
+  anexosOriginais: any[] = []
+) => {
+  // 1. Identificar excluídos
+  const originalIds = anexosOriginais.map(a => a.id).filter(Boolean);
+  const formIds = anexosForm.map(a => a.id).filter(Boolean);
+  const deletedIds = originalIds.filter(id => !formIds.includes(id));
+
+  for (const id of deletedIds) {
+    const orig = anexosOriginais.find(o => o.id === id);
+    if (!orig) continue;
+
+    if (orig.tipo_arquivo === 'documento') {
+      const { data: doc } = await supabase
+        .from("documentos")
+        .select("id, storage_path")
+        .eq("titulo", orig.nome)
+        .eq("projeto_id", projetoId)
+        .maybeSingle();
+
+      if (doc) {
+        await supabase.from("documentos").delete().eq("id", doc.id);
+        if (doc.storage_path) {
+          await supabase.storage.from("documentos").remove([doc.storage_path]);
+        }
+      }
+    } else {
+      if (orig.url) {
+        const parts = orig.url.split("/imagens/");
+        if (parts[1]) {
+          await supabase.storage.from("imagens").remove([parts[1]]);
+        }
+      }
+    }
+    await supabase.from("arquivos_midia").delete().eq("id", id);
+  }
+
+  // 2. Upload de novos anexos
+  const novosAnexos = anexosForm.filter(a => a.dataUrl && a.dataUrl.startsWith("data:"));
+  if (novosAnexos.length === 0) return;
+
+  const categoriaId = await getOrCreateAtividadesCategoria();
+  const { data: userData } = await supabase.auth.getUser();
+  const uid = userData.user?.id;
+
+  for (const anexo of novosAnexos) {
+    try {
+      const file = dataURLtoFile(anexo.dataUrl, anexo.nome);
+      const isImg = isImageFile(file);
+
+      if (isImg) {
+        const ext = file.name.split(".").pop() ?? "jpg";
+        const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("imagens")
+          .upload(fileName, file, { cacheControl: "3600", upsert: false });
+
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage.from("imagens").getPublicUrl(fileName);
+        const publicUrl = urlData.publicUrl;
+
+        await supabase.from("arquivos_midia").insert({
+          projeto_id: projetoId || null,
+          atividade_id: atividadeId,
+          categoria_id: categoriaId,
+          nome: file.name,
+          url: publicUrl,
+          tipo_arquivo: "imagem",
+          data: new Date().toISOString().split("T")[0],
+        });
+
+      } else {
+        const ext = file.name.split(".").pop() ?? "bin";
+        const path = `${uid ?? "anon"}/${crypto.randomUUID()}.${ext}`;
+
+        const { error: upErr } = await supabase.storage
+          .from("documentos")
+          .upload(path, file, {
+            contentType: file.type,
+            upsert: false,
+          });
+
+        if (upErr) throw upErr;
+
+        const { data: newDoc, error: docInsertErr } = await supabase
+          .from("documentos")
+          .insert({
+            titulo: file.name,
+            descricao: `Anexo da Atividade: ${atividadeId}`,
+            categoria_id: categoriaId,
+            projeto_id: projetoId || null,
+            storage_path: path,
+            mime_type: file.type,
+            tamanho: file.size,
+            versao: 1,
+            created_by: uid,
+          })
+          .select("id")
+          .single();
+
+        if (docInsertErr) {
+          await supabase.storage.from("documentos").remove([path]);
+          throw docInsertErr;
+        }
+
+        const { data: urlData } = supabase.storage.from("documentos").getPublicUrl(path);
+        const fileUrl = urlData.publicUrl;
+
+        await supabase.from("arquivos_midia").insert({
+          projeto_id: projetoId || null,
+          atividade_id: atividadeId,
+          categoria_id: categoriaId,
+          nome: file.name,
+          url: fileUrl,
+          tipo_arquivo: "documento",
+          data: new Date().toISOString().split("T")[0],
+        });
+      }
+    } catch (err) {
+      console.error(`Erro ao fazer upload do anexo ${anexo.nome}:`, err);
+    }
+  }
+};
+
 // ─── Database Row → AtividadeFull ─────────────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToAtividade(row: any): AtividadeFull {
+  const arquivosMidiaMapped = (row.arquivos_midia ?? []).map((am: any) => ({
+    id: am.id,
+    nome: am.nome,
+    url: am.url,
+    tipo_arquivo: am.tipo_arquivo,
+  }));
+
+  const anexosMapped = row.anexos ?? (arquivosMidiaMapped.length > 0 
+    ? arquivosMidiaMapped.map((am: any) => ({
+        id: am.id,
+        nome: am.nome,
+        url: am.url,
+        tipo_arquivo: am.tipo_arquivo,
+      }))
+    : undefined);
+
   return {
     id: row.id,
     projetoId: row.projeto_id ?? "",
@@ -71,9 +262,9 @@ function rowToAtividade(row: any): AtividadeFull {
     local: row.local ?? "",
     municipio: row.municipio ?? undefined,
     responsaveis: row.responsaveis ?? "",
-    // indicadores are stored as JSON in a dedicated column (if present)
     indicadores: row.indicadores ?? undefined,
-    anexos: row.anexos ?? undefined,
+    anexos: anexosMapped,
+    arquivosMidia: arquivosMidiaMapped,
   };
 }
 
@@ -82,11 +273,11 @@ export const initAtividades = async () => {
   if (initialized) return;
   initialized = true;
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase
     .from("atividades")
-    .select("*")
+    .select("*, arquivos_midia(*)")
     .not("projeto_id", "is", null)
-    .order("data", { ascending: false });
+    .order("data", { ascending: false }) as any);
 
   if (error) {
     console.error("[atividadesStore] init error:", error);
@@ -101,11 +292,11 @@ export const initAtividadesIndependentes = async () => {
   if (initializedIndependentes) return;
   initializedIndependentes = true;
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase
     .from("atividades")
-    .select("*")
+    .select("*, arquivos_midia(*)")
     .is("projeto_id", null)
-    .order("data", { ascending: false });
+    .order("data", { ascending: false }) as any);
 
   if (error) {
     console.error("[atividadesStore] init independentes error:", error);
@@ -133,7 +324,7 @@ export const addAtividade = async (
       municipio: a.municipio || null,
       responsaveis: a.responsaveis || null,
       indicadores: a.indicadores || null,
-      anexos: a.anexos || null,
+      anexos: null,
     })
     .select()
     .single();
@@ -143,7 +334,17 @@ export const addAtividade = async (
     throw error ?? new Error("Falha ao salvar atividade.");
   }
 
-  const novo = rowToAtividade(data);
+  if (a.anexos && a.anexos.length > 0) {
+    await processAnexosAtividade(data.id, data.projeto_id, a.anexos, []);
+  }
+
+  const { data: updatedData } = await (supabase
+    .from("atividades")
+    .select("*, arquivos_midia(*)")
+    .eq("id", data.id)
+    .single() as any);
+
+  const novo = rowToAtividade(updatedData || data);
   if (novo.projetoId) {
     atividades = sortDesc([novo, ...atividades]);
     emit();
@@ -170,8 +371,6 @@ export const updateAtividade = async (
     updatePayload.responsaveis = patch.responsaveis;
   if (patch.indicadores !== undefined)
     updatePayload.indicadores = patch.indicadores || null;
-  if (patch.anexos !== undefined)
-    updatePayload.anexos = patch.anexos || null;
 
   const { error } = await supabase
     .from("atividades")
@@ -183,15 +382,39 @@ export const updateAtividade = async (
     throw error;
   }
 
+  if (patch.anexos !== undefined) {
+    const { data: currentMidias } = await supabase
+      .from("arquivos_midia")
+      .select("id, nome, url, tipo_arquivo")
+      .eq("atividade_id", id);
+
+    const anexosOriginais = (currentMidias ?? []).map(cm => ({
+      id: cm.id,
+      nome: cm.nome,
+      url: cm.url,
+      tipo_arquivo: cm.tipo_arquivo,
+    }));
+
+    await processAnexosAtividade(id, patch.projetoId || null, patch.anexos, anexosOriginais);
+  }
+
+  const { data: updatedData } = await (supabase
+    .from("atividades")
+    .select("*, arquivos_midia(*)")
+    .eq("id", id)
+    .single() as any);
+
+  const updatedAtividade = rowToAtividade(updatedData);
+
   if (patch.projetoId || atividades.some((a) => a.id === id)) {
     atividades = sortDesc(
-      atividades.map((a) => (a.id === id ? { ...a, ...patch, editado: true } : a))
+      atividades.map((a) => (a.id === id ? { ...updatedAtividade, editado: true } : a))
     );
     emit();
   }
   if (!patch.projetoId || atividadesIndependentes.some((a) => a.id === id)) {
     atividadesIndependentes = sortDesc(
-      atividadesIndependentes.map((a) => (a.id === id ? { ...a, ...patch, editado: true } : a))
+      atividadesIndependentes.map((a) => (a.id === id ? { ...updatedAtividade, editado: true } : a))
     );
     emitIndependentes();
   }

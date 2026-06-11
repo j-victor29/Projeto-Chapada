@@ -70,6 +70,10 @@ import {
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { CollaboratorsSection } from "@/components/CollaboratorsSection";
 import { toast } from "sonner";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { PaginationControls } from "@/components/PaginationControls";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const Route = createFileRoute("/imagens")({
   component: ImagensPage,
@@ -95,12 +99,10 @@ interface PendingFile {
 const emptyForm = { projetoId: "", projetoNome: "", local: "", tipo: "", date: "", categoriaId: "" };
 
 function ImagensPage() {
-  const storeImgs = useImagens();
-  const [images, setImages] = useState<ImagemItem[]>([]);
+  const queryClient = useQueryClient();
+  const { session } = useAuth();
+  const [page, setPage] = useState(0);
 
-  useEffect(() => {
-    setImages(storeImgs);
-  }, [storeImgs]);
   const { data: dbMunicipios = [] } = Municipios.useList();
   const categorias = useCategorias();
   const projetos = useProjetos();
@@ -116,6 +118,11 @@ function ImagensPage() {
   const [selProjeto, setSelProjeto] = useState("todos");
   const [selTipo, setSelTipo] = useState("todos");
   const [selMunicipio, setSelMunicipio] = useState("todos");
+
+  // Reset page to 0 on filter change
+  useEffect(() => {
+    setPage(0);
+  }, [dataDe, dataAte, categoriaFiltro, selProjeto, selTipo, selMunicipio, query]);
 
   const hasActiveFilters = useMemo(() => {
     return (
@@ -144,25 +151,82 @@ function ImagensPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return images.filter((i) => {
-      const matchesQuery = !q ||
-        [i.projeto, i.local, i.tipo, i.date, i.nomeArquivo, i.categoriaNome]
-          .join(" ")
-          .toLowerCase()
-          .includes(q);
-      const matchesCategoria =
-        categoriaFiltro.length === 0 || (i.categoriaId && categoriaFiltro.includes(i.categoriaId));
-      const matchesData =
-        (!dataDe || (i.dataIso && i.dataIso >= dataDe)) &&
-        (!dataAte || (i.dataIso && i.dataIso <= dataAte));
-      const matchesProjeto = selProjeto === "todos" || i.projetoId === selProjeto;
-      const matchesTipo = selTipo === "todos" || i.tipo === selTipo;
-      const matchesMunicipio = selMunicipio === "todos" || i.local === selMunicipio;
-      return matchesQuery && matchesCategoria && matchesData && matchesProjeto && matchesTipo && matchesMunicipio;
-    });
-  }, [images, query, categoriaFiltro, dataDe, dataAte, selProjeto, selTipo, selMunicipio]);
+  const { data: paginatedData, isLoading: isListLoading } = useQuery({
+    queryKey: ["arquivos_midia-paginated", page, dataDe, dataAte, selProjeto, selTipo, selMunicipio, categoriaFiltro, query],
+    enabled: !!session,
+    queryFn: async () => {
+      let qBuilder = supabase
+        .from("arquivos_midia")
+        .select("*, projetos(nome), categorias(nome)", { count: "exact" })
+        .eq("tipo_arquivo", "imagem");
+
+      if (selProjeto !== "todos") {
+        qBuilder = qBuilder.eq("projeto_id", selProjeto);
+      }
+      if (selTipo !== "todos") {
+        qBuilder = qBuilder.eq("tipo_acao", selTipo);
+      }
+      if (selMunicipio !== "todos") {
+        qBuilder = qBuilder.eq("local", selMunicipio);
+      }
+      if (dataDe) {
+        qBuilder = qBuilder.gte("data", dataDe);
+      }
+      if (dataAte) {
+        qBuilder = qBuilder.lte("data", dataAte);
+      }
+      if (categoriaFiltro.length > 0) {
+        qBuilder = qBuilder.in("categoria_id", categoriaFiltro);
+      }
+
+      if (query.trim()) {
+        const q = query.trim().toLowerCase();
+        let orFilter = `nome.ilike.%${q}%,tipo_acao.ilike.%${q}%,local.ilike.%${q}%`;
+        const matchingProjs = projetos.filter(p => p.nome.toLowerCase().includes(q));
+        if (matchingProjs.length > 0) {
+          orFilter += `,projeto_id.in.(${matchingProjs.map(p => `"${p.id}"`).join(',')})`;
+        }
+        qBuilder = qBuilder.or(orFilter);
+      }
+
+      qBuilder = qBuilder
+        .order("created_at", { ascending: false })
+        .range(page * 24, (page + 1) * 24 - 1);
+
+      const { data, count, error } = await qBuilder;
+      if (error) throw error;
+
+      return {
+        data: (data ?? []).map((row: any) => {
+          let dateDisplay = "";
+          if (row.data) {
+            const [y, m, d] = row.data.split("-");
+            dateDisplay = `${d}/${m}/${y}`;
+          }
+          const nomeProjeto = row.projetos?.nome ?? "";
+          const nomeCategoria = row.categorias?.nome ?? undefined;
+          return {
+            id: row.id,
+            projeto: nomeProjeto,
+            projetoId: row.projeto_id ?? undefined,
+            local: row.local ?? "",
+            tipo: row.tipo_acao ?? "",
+            date: dateDisplay,
+            dataIso: row.data ?? "",
+            url: row.url ?? "",
+            nomeArquivo: row.nome ?? "",
+            categoriaId: row.categoria_id ?? undefined,
+            categoriaNome: nomeCategoria,
+            dataUrl: row.url ?? "",
+          };
+        }),
+        count: count ?? 0,
+      };
+    }
+  });
+
+  const filtered = paginatedData?.data ?? [];
+  const total = paginatedData?.count ?? 0;
 
   const openPicker = () => fileInputRef.current?.click();
 
@@ -208,6 +272,7 @@ function ImagensPage() {
         title: "Nova imagem enviada",
         body: `${form.projetoNome || "Projeto"} — ${form.local}`,
       });
+      await queryClient.invalidateQueries({ queryKey: ["arquivos_midia-paginated"] });
       toast.success("Imagem adicionada à galeria.");
       URL.revokeObjectURL(pending.previewUrl);
       setPending(null);
@@ -259,6 +324,7 @@ function ImagensPage() {
         tipo: form.tipo,
         date: form.date,
       });
+      await queryClient.invalidateQueries({ queryKey: ["arquivos_midia-paginated"] });
       toast.success("Imagem atualizada.");
       setEditing(null);
     } catch {
@@ -287,7 +353,7 @@ function ImagensPage() {
     try {
       await removeImagem(deletedId);
       removeOwnership("imagem", deletedId);
-      setImages((prev) => prev.filter((img) => img.id !== deletedId));
+      await queryClient.invalidateQueries({ queryKey: ["arquivos_midia-paginated"] });
       toast.success("Imagem excluída.");
     } catch {
       toast.error("Erro ao excluir imagem.");
@@ -448,7 +514,13 @@ function ImagensPage() {
         </CardContent>
       </Card>
 
-      {filtered.length === 0 ? (
+      {isListLoading ? (
+        <div className="chapada-empty">
+          <h3 className="text-base font-semibold text-foreground mb-1">
+            Carregando galeria...
+          </h3>
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="chapada-empty">
           <div className="chapada-empty-icon">
             <FolderOpen className="h-8 w-8" />
@@ -456,84 +528,91 @@ function ImagensPage() {
           <h3 className="text-base font-semibold text-foreground mb-1">
             {query || categoriaFiltro.length > 0 || dataDe || dataAte
               ? "Nenhuma imagem encontrada para este filtro."
-              : images.length === 0
-              ? "Galeria vazia"
-              : "Carregando galeria..."}
+              : "Galeria vazia"}
           </h3>
-          {images.length === 0 && !query && (
+          {filtered.length === 0 && !query && (
             <p className="text-sm text-muted-foreground">
               Clique em "Enviar Imagens" para começar.
             </p>
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {filtered.map((img) => (
-            <Card
-              key={img.id}
-              className="chapada-card overflow-hidden group cursor-pointer transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 relative"
-            >
-              <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openEdit(img);
-                  }}
-                  className="h-8 w-8 grid place-items-center rounded-md bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
-                  aria-label="Editar imagem"
-                >
-                  <Pencil className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    requestDelete(img);
-                  }}
-                  className="h-8 w-8 grid place-items-center rounded-md bg-destructive text-destructive-foreground shadow-md hover:bg-destructive/90"
-                  aria-label="Excluir imagem"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-              <div
-                onClick={() => setSelected(img)}
-                className="aspect-square relative bg-muted overflow-hidden"
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {filtered.map((img) => (
+              <Card
+                key={img.id}
+                className="chapada-card overflow-hidden group cursor-pointer transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 relative"
               >
-                <img
-                  src={img.url}
-                  alt={`${img.projeto} - ${img.tipo}`}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-              </div>
-              <CardContent className="p-3" onClick={() => setSelected(img)}>
-                <div className="text-sm font-medium truncate">{img.projeto}</div>
-                <div className="text-xs text-muted-foreground mt-0.5">
-                  {img.local} · {img.date}
+                <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openEdit(img);
+                    }}
+                    className="h-8 w-8 grid place-items-center rounded-md bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
+                    aria-label="Editar imagem"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      requestDelete(img);
+                    }}
+                    className="h-8 w-8 grid place-items-center rounded-md bg-destructive text-destructive-foreground shadow-md hover:bg-destructive/90"
+                    aria-label="Excluir imagem"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
-                <div className="flex flex-wrap gap-1 mt-2">
-                  <Badge variant="secondary" className="text-[10px]">
-                    {img.tipo}
-                  </Badge>
-                  {img.categoriaNome && (
-                    <Badge variant="outline" className="text-[10px]">
-                      {img.categoriaNome}
+                <div
+                  onClick={() => setSelected(img)}
+                  className="aspect-square relative bg-muted overflow-hidden"
+                >
+                  <img
+                    src={img.url}
+                    alt={`${img.projeto} - ${img.tipo}`}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                </div>
+                <CardContent className="p-3" onClick={() => setSelected(img)}>
+                  <div className="text-sm font-medium truncate">{img.projeto}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {img.local} · {img.date}
+                  </div>
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    <Badge className="text-[10px] bg-savanna/15 text-savanna border-savanna/30 border">
+                      {img.tipo}
                     </Badge>
-                  )}
-                </div>
-                {(() => {
-                  const o = getOwnership("imagem", img.id);
-                  return o ? (
-                    <div className="text-[10px] text-muted-foreground mt-1">
-                      Criado por {o.ownerName}
-                    </div>
-                  ) : null;
-                })()}
-              </CardContent>
-            </Card>
-          ))}
+                    {img.categoriaNome && (
+                      <Badge variant="outline" className="text-[10px]">
+                        {img.categoriaNome}
+                      </Badge>
+                    )}
+                  </div>
+                  {(() => {
+                    const o = getOwnership("imagem", img.id);
+                    return o ? (
+                      <div className="text-[10px] text-muted-foreground mt-1">
+                        Criado por {o.ownerName}
+                      </div>
+                    ) : null;
+                  })()}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <PaginationControls
+            page={page}
+            setPage={setPage}
+            count={total}
+            pageSize={24}
+          />
         </div>
       )}
 

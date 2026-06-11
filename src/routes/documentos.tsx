@@ -1,5 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { PaginationControls } from "@/components/PaginationControls";
 import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,11 +25,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Plus, Upload, Trash2, Download, History, FileText, Search, GitBranch, FolderOpen, FileUp, Filter, X } from "lucide-react";
-import { useDocumentos, useCategorias, useUploadDocumento, useDeleteDocumento, getDocumentoUrl, type Documento } from "@/lib/documentosStore";
+import { useCategorias, useUploadDocumento, useDeleteDocumento, getDocumentoUrl, type Documento } from "@/lib/documentosStore";
 import { useProjetos } from "@/lib/projetosStore";
 import { addNotification } from "@/lib/notificationsStore";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const Route = createFileRoute("/documentos")({
   component: DocumentosPage,
@@ -117,11 +121,13 @@ function EmptyState({ icon: Icon, title, description }: EmptyStateProps) {
     </div>
   );
 }
+const PAGE_SIZE = 20;
+
 function DocumentosPage() {
-  const { data: docs, isLoading } = useDocumentos();
+  const { session } = useAuth();
   const { data: cats } = useCategorias();
-  const projs = useProjetos(); // useProjetos reads synchronously from the local store
-  
+  const projs = useProjetos();
+
   const upload = useUploadDocumento();
   const del = useDeleteDocumento();
 
@@ -150,6 +156,7 @@ function DocumentosPage() {
   const [filtroProjeto, setFiltroProjeto] = useState("todos");
   const [dataDe, setDataDe] = useState("");
   const [dataAte, setDataAte] = useState("");
+  const [page, setPage] = useState(0);
 
   const isPeriodInvalid = !!(dataDe && dataAte && dataDe > dataAte);
 
@@ -169,7 +176,63 @@ function DocumentosPage() {
     setFiltroProjeto("todos");
     setDataDe("");
     setDataAte("");
+    setPage(0);
   };
+
+  // Query paginada: busca documentos raiz com filtros aplicados no servidor
+  const { data: pagedResult, isLoading } = useQuery({
+    queryKey: ["documentos-paginated", page, busca, filtroCategoria, filtroProjeto, dataDe, dataAte],
+    enabled: !!session,
+    queryFn: async () => {
+      let q = supabase
+        .from("documentos")
+        .select("*", { count: "exact" })
+        .is("documento_pai_id", null)
+        .order("created_at", { ascending: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+      if (busca.trim()) {
+        q = q.or(
+          `titulo.ilike.%${busca.trim()}%,descricao.ilike.%${busca.trim()}%`
+        );
+      }
+      if (filtroCategoria !== "todos") {
+        q = q.eq("categoria_id", filtroCategoria);
+      }
+      if (filtroProjeto !== "todos") {
+        q = q.eq("projeto_id", filtroProjeto);
+      }
+      if (dataDe) {
+        q = q.gte("created_at", dataDe);
+      }
+      if (dataAte) {
+        q = q.lte("created_at", dataAte + "T23:59:59");
+      }
+
+      const { data, count, error } = await q;
+      if (error) throw error;
+      return { docs: (data ?? []) as Documento[], count: count ?? 0 };
+    },
+    placeholderData: (prev) => prev,
+  });
+
+  // Query separada para buscar TODAS as versões (necessário para o modal de versões)
+  const { data: allDocs } = useQuery({
+    queryKey: ["documentos-all-versions"],
+    enabled: !!session,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("documentos")
+        .select("id, titulo, versao, tamanho, created_at, documento_pai_id, storage_path")
+        .not("documento_pai_id", "is", null)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as Documento[];
+    },
+  });
+
+  const rootDocs = pagedResult?.docs ?? [];
+  const totalCount = pagedResult?.count ?? 0;
   
   // Delete Dialog State
   const [toDelete, setToDelete] = useState<Documento | null>(null);
@@ -181,44 +244,14 @@ function DocumentosPage() {
   const projMap = useMemo(() => new Map((projs ?? []).map((p) => [p.id, p.nome])), [projs]);
   const catMap = useMemo(() => new Map((cats ?? []).map((c) => [c.id, c.nome])), [cats]);
 
-  const filtered = useMemo(() => {
-    if (!docs) return [];
-    const q = busca.toLowerCase().trim();
-    return docs.filter((d) => {
-      // 1. Text Search (title, description, tags)
-      if (q) {
-        const matchesTitle = d.titulo.toLowerCase().includes(q);
-        const matchesDesc = (d.descricao ?? "").toLowerCase().includes(q);
-        const matchesTags = (d.tags ?? []).some(t => t.toLowerCase().includes(q));
-        if (!matchesTitle && !matchesDesc && !matchesTags) return false;
-      }
-      // 2. Category Filter
-      if (filtroCategoria !== "todos" && d.categoria_id !== filtroCategoria) return false;
-      // 3. Project Filter
-      if (filtroProjeto !== "todos" && d.projeto_id !== filtroProjeto) return false;
-      // 4. Date Period Filter
-      if (dataDe || dataAte) {
-        if (!d.created_at) return false;
-        const docDate = d.created_at.substring(0, 10);
-        if (dataDe && docDate < dataDe) return false;
-        if (dataAte && docDate > dataAte) return false;
-      }
-
-      return true;
-    });
-  }, [docs, busca, filtroCategoria, filtroProjeto, dataDe, dataAte]);
-
-  // Main / Root documents (documents that do not have a parent document)
-  const rootDocs = useMemo(() => {
-    return filtered.filter((d) => !d.documento_pai_id);
-  }, [filtered]);
-
-  // Get all versions (history) for a document
+  // Get all versions (history) for a document (uses the lighter all-versions query)
   const versionsOf = (docId: string) => {
-    if (!docs) return [];
-    return docs
-      .filter((d) => d.documento_pai_id === docId || d.id === docId)
-      .sort((a, b) => b.versao - a.versao); // Sorted descending so newest is first
+    const versionsData = allDocs ?? [];
+    // Include the root doc itself (from rootDocs list) + child versions
+    const root = rootDocs.find((d) => d.id === docId);
+    const children = versionsData.filter((d) => d.documento_pai_id === docId);
+    const combined = root ? [root, ...children] : children;
+    return combined.sort((a, b) => b.versao - a.versao);
   };
 
   const submit = async () => {
@@ -522,7 +555,7 @@ function DocumentosPage() {
             icon={FileText}
             title="Nenhum documento encontrado"
             description={
-              busca || filtroCategoria !== "todos" || filtroProjeto !== "todos"
+              hasActiveFilters
                 ? "Experimente mudar as palavras-chave ou remover os filtros aplicados."
                 : "Envie o primeiro documento institucional para iniciar a biblioteca."
             }
@@ -647,6 +680,16 @@ function DocumentosPage() {
               );
             })}
           </div>
+        )}
+
+        {/* Controles de paginação */}
+        {totalCount > PAGE_SIZE && (
+          <PaginationControls
+            page={page}
+            setPage={setPage}
+            count={totalCount}
+            pageSize={PAGE_SIZE}
+          />
         )}
       </div>
 

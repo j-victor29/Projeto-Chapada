@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo, Suspense } from "react";
+import { useState, useMemo, Suspense, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
+import { PaginationControls } from "@/components/PaginationControls";
+import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,6 +68,7 @@ function CadastrosPage() {
 
 function CrudShell({
   title, items, columns, renderForm, onSave, onDelete, getId, getRowValues, blank, canEdit, canDelete,
+  searchExternal, onSearchExternalChange, pagination,
 }: {
   title: string;
   items: any[] | undefined;
@@ -78,6 +81,14 @@ function CrudShell({
   blank: any;
   canEdit?: (row: any) => boolean;
   canDelete?: (row: any) => boolean;
+  searchExternal?: string;
+  onSearchExternalChange?: (s: string) => void;
+  pagination?: {
+    page: number;
+    setPage: (p: number) => void;
+    count: number;
+    pageSize: number;
+  };
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<any>(blank);
@@ -85,8 +96,18 @@ function CrudShell({
   const search = useDebounce(localSearch, 300);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  const isPaginated = !!pagination;
+
+  // Sync external search if paginated
+  useEffect(() => {
+    if (isPaginated && onSearchExternalChange) {
+      onSearchExternalChange(search);
+    }
+  }, [search, isPaginated, onSearchExternalChange]);
+
   const filteredItems = useMemo(() => {
     if (!items) return [];
+    if (isPaginated) return items; // Already filtered and paginated on server
     if (!search.trim()) return items;
     const lowerSearch = search.toLowerCase().trim();
     return items.filter(item => {
@@ -96,7 +117,7 @@ function CrudShell({
         return String(val ?? "").toLowerCase().includes(lowerSearch);
       });
     });
-  }, [items, search, columns, getRowValues]);
+  }, [items, search, columns, getRowValues, isPaginated]);
 
   return (
     <Card className="chapada-filter-card shadow-sm">
@@ -200,6 +221,15 @@ function CrudShell({
             </tbody>
           </table>
         </div>
+
+        {isPaginated && pagination && (
+          <PaginationControls
+            page={pagination.page}
+            setPage={pagination.setPage}
+            count={pagination.count}
+            pageSize={pagination.pageSize}
+          />
+        )}
 
         <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
           <AlertDialogContent className="rounded-xl border border-muted bg-card/95 backdrop-blur-md shadow-2xl">
@@ -433,25 +463,56 @@ function MunicipiosTab() {
 }
 
 function ComunidadesTab() {
-  const { data } = Comunidades.useList();
+  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<"todos" | "comunidade" | "local">("todos");
+
   const { data: muns } = Municipios.useList();
   const upsert = Comunidades.useUpsert();
   const del = Comunidades.useDelete();
 
-  const [filter, setFilter] = useState<"todos" | "comunidade" | "local">("todos");
+  // Reset page to 0 on filter change
+  useEffect(() => {
+    setPage(0);
+  }, [filter]);
+
+  const handleSearchChange = (newSearch: string) => {
+    setSearch(newSearch);
+    setPage(0);
+  };
+
+  const { data: paginatedData } = useQuery({
+    queryKey: ["comunidades-paginated", page, filter, search],
+    queryFn: async () => {
+      let qBuilder = supabase
+        .from("comunidades")
+        .select("*", { count: "exact" });
+
+      if (filter === "comunidade") {
+        qBuilder = qBuilder.eq("categoria", "Comunidade");
+      } else if (filter === "local") {
+        qBuilder = qBuilder.eq("categoria", "Local/Espaço");
+      }
+
+      if (search.trim()) {
+        const q = search.trim().toLowerCase();
+        qBuilder = qBuilder.ilike("nome", `%${q}%`);
+      }
+
+      qBuilder = qBuilder
+        .order("nome", { ascending: true })
+        .range(page * 25, (page + 1) * 25 - 1);
+
+      const { data, count, error } = await qBuilder;
+      if (error) throw error;
+      return { data: data || [], count: count || 0 };
+    }
+  });
+
+  const communitiesList = paginatedData?.data || [];
+  const totalCount = paginatedData?.count || 0;
   
   const munMap = useMemo(() => new Map((muns ?? []).map((m) => [m.id, m.nome])), [muns]);
-
-  const filteredData = useMemo(() => {
-    if (!data) return [];
-    if (filter === "comunidade") {
-      return data.filter((c) => c.categoria === "Comunidade");
-    }
-    if (filter === "local") {
-      return data.filter((c) => c.categoria === "Local/Espaço");
-    }
-    return data;
-  }, [data, filter]);
   
   return (
     <div className="space-y-4">
@@ -485,7 +546,7 @@ function ComunidadesTab() {
 
       <CrudShell
         title={filter === "todos" ? "Comunidades & Locais" : filter === "comunidade" ? "Comunidades" : "Locais"}
-        items={filteredData}
+        items={communitiesList}
         columns={[
           { label: "Nome", key: "nome" },
           { label: "Município", key: "_mun" },
@@ -498,6 +559,14 @@ function ComunidadesTab() {
           _mun: r.municipio_id ? munMap.get(r.municipio_id) : "" 
         })}
         blank={{ nome: "", municipio_id: null, tipo: "", categoria: "Comunidade" }}
+        searchExternal={search}
+        onSearchExternalChange={handleSearchChange}
+        pagination={{
+          page,
+          setPage,
+          count: totalCount,
+          pageSize: 25,
+        }}
         renderForm={(s, set) => (
           <>
             <div className="space-y-1">
@@ -561,13 +630,13 @@ function ComunidadesTab() {
 
           const nomeNormalizado = toTitleCase(s.nome.trim());
           
-          // Verificar duplicata
-          const duplicado = (data ?? []).some(
-            (c) => 
-              c.nome.toLowerCase() === nomeNormalizado.toLowerCase() && 
-              c.id !== s.id
-          );
-          if (duplicado) {
+          // Verificar duplicata no servidor
+          const { data: dupData, error: dupError } = await supabase
+            .from("comunidades")
+            .select("id")
+            .ilike("nome", nomeNormalizado)
+            .limit(1);
+          if (!dupError && dupData && dupData.length > 0 && dupData[0].id !== s.id) {
             throw new Error(`Já existe uma comunidade ou local com o nome "${nomeNormalizado}".`);
           }
 
@@ -642,14 +711,46 @@ function TiposAcaoTab() {
 }
 
 function FinanciadoresTab() {
-  const { data } = Financiadores.useList();
+  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState("");
+
   const upsert = Financiadores.useUpsert();
   const del = Financiadores.useDelete();
+
+  const handleSearchChange = (newSearch: string) => {
+    setSearch(newSearch);
+    setPage(0);
+  };
+
+  const { data: paginatedData } = useQuery({
+    queryKey: ["financiadores-paginated", page, search],
+    queryFn: async () => {
+      let qBuilder = supabase
+        .from("financiadores")
+        .select("*", { count: "exact" });
+
+      if (search.trim()) {
+        const q = search.trim().toLowerCase();
+        qBuilder = qBuilder.or(`nome.ilike.%${q}%,tipo.ilike.%${q}%,contato.ilike.%${q}%`);
+      }
+
+      qBuilder = qBuilder
+        .order("nome", { ascending: true })
+        .range(page * 25, (page + 1) * 25 - 1);
+
+      const { data, count, error } = await qBuilder;
+      if (error) throw error;
+      return { data: data || [], count: count || 0 };
+    }
+  });
+
+  const fundersList = paginatedData?.data || [];
+  const totalCount = paginatedData?.count || 0;
   
   return (
     <CrudShell
       title="Financiadores"
-      items={data}
+      items={fundersList}
       columns={[
         { label: "Nome", key: "nome" },
         { label: "Tipo", key: "tipo" },
@@ -658,6 +759,14 @@ function FinanciadoresTab() {
       getId={(r) => r.id}
       getRowValues={(r) => r}
       blank={{ nome: "", tipo: "privado", contato: "", site: "", cnpj: "" }}
+      searchExternal={search}
+      onSearchExternalChange={handleSearchChange}
+      pagination={{
+        page,
+        setPage,
+        count: totalCount,
+        pageSize: 25,
+      }}
       renderForm={(s, set) => (
         <>
           <div className="space-y-1">
@@ -791,11 +900,43 @@ function PublicosTab() {
 }
 
 function FamiliasTab() {
-  const { data } = Familias.useList();
+  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState("");
+
   const { data: muns } = Municipios.useList();
   const { data: coms } = Comunidades.useList();
   const upsert = Familias.useUpsert();
   const del = Familias.useDelete();
+
+  const handleSearchChange = (newSearch: string) => {
+    setSearch(newSearch);
+    setPage(0);
+  };
+
+  const { data: paginatedData } = useQuery({
+    queryKey: ["beneficiarios-paginated", page, search],
+    queryFn: async () => {
+      let qBuilder = supabase
+        .from("beneficiarios")
+        .select("*", { count: "exact" });
+
+      if (search.trim()) {
+        const q = search.trim().toLowerCase();
+        qBuilder = qBuilder.or(`nome_responsavel.ilike.%${q}%,cpf.ilike.%${q}%,nis.ilike.%${q}%`);
+      }
+
+      qBuilder = qBuilder
+        .order("nome_responsavel", { ascending: true })
+        .range(page * 20, (page + 1) * 20 - 1);
+
+      const { data, count, error } = await qBuilder;
+      if (error) throw error;
+      return { data: data || [], count: count || 0 };
+    }
+  });
+
+  const familiesList = paginatedData?.data || [];
+  const totalCount = paginatedData?.count || 0;
   
   const munMap = useMemo(() => new Map((muns ?? []).map((m) => [m.id, m.nome])), [muns]);
   const comMap = useMemo(() => new Map((coms ?? []).map((c) => [c.id, c.nome])), [coms]);
@@ -803,7 +944,7 @@ function FamiliasTab() {
   return (
     <CrudShell
       title="Famílias"
-      items={data}
+      items={familiesList}
       columns={[
         { label: "Responsável", key: "nome_responsavel" },
         { label: "Município", key: "_mun" },
@@ -825,6 +966,14 @@ function FamiliasTab() {
         comunidade_id: null,
         quilombola: false,
         povo_originario: false,
+      }}
+      searchExternal={search}
+      onSearchExternalChange={handleSearchChange}
+      pagination={{
+        page,
+        setPage,
+        count: totalCount,
+        pageSize: 20,
       }}
       renderForm={(s, set) => (
         <>

@@ -23,6 +23,7 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { useAtividades, useAtividadesIndicadores, useAtividadesIndependentes, refreshAtividades } from "@/lib/atividadesStore";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const Route = createFileRoute("/indicadores")({
   component: IndicadoresPage,
@@ -65,12 +66,14 @@ async function chartToPng(node: HTMLElement | null): Promise<string | null> {
 function IndicadoresPage() {
   const barRef = useRef<HTMLDivElement>(null);
   const pieRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth();
 
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
+    if (!user) return; // wait for auth to be ready
     refreshAtividades();
-  }, []);
+  }, [user?.id]);
 
   const handleRefresh = async () => {
     setRefreshing(true);

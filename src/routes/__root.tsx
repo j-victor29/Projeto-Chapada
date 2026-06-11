@@ -1,6 +1,7 @@
 import { Outlet, Link, createRootRoute, useRouter } from "@tanstack/react-router";
+import { Suspense } from "react";
 import { Toaster } from "@/components/ui/sonner";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { SearchProvider } from "@/contexts/SearchContext";
 import { useSeedOwnership } from "@/lib/useSeedOwnership";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -57,6 +58,38 @@ function NotFoundComponent() {
   );
 }
 
+/** Full-screen spinner shown while auth initializes or a lazy chunk loads */
+function PageLoader() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex flex-col items-center gap-3">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <p className="text-sm text-muted-foreground">Carregando...</p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Inner shell rendered inside AuthProvider.
+ * Blocks rendering until auth is resolved so TanStack Query / store hooks
+ * always have a valid session when they first execute (fixes the F5 bug).
+ * Wraps the Outlet in Suspense so lazy-loaded route chunks show a spinner.
+ */
+function AppShell() {
+  useSeedOwnership();
+  const { loading } = useAuth();
+
+  if (loading) return <PageLoader />;
+
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <Outlet />
+      <Toaster richColors position="top-right" />
+    </Suspense>
+  );
+}
+
 export const Route = createRootRoute({
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
@@ -64,13 +97,11 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
-  useSeedOwnership();
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <SearchProvider>
-          <Outlet />
-          <Toaster richColors position="top-right" />
+          <AppShell />
         </SearchProvider>
       </AuthProvider>
     </QueryClientProvider>

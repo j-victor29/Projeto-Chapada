@@ -76,7 +76,8 @@ import { useCurrentUser } from "@/lib/useCurrentUser";
 import { CollaboratorsSection } from "@/components/CollaboratorsSection";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { PaginationControls } from "@/components/PaginationControls";
 import {
   useIbgeAutocomplete,
   useFavoritos,
@@ -294,64 +295,107 @@ function AtividadesPage() {
     [projetos]
   );
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return ordenadas.filter((a) => {
-      if (q) {
-        const proj = projetoMap.get(a.projetoId)?.nome ?? "";
-        const matchesQuery = [a.descricao, a.tipo, a.local, a.responsaveis, a.municipio ?? "", proj]
-          .join(" ")
-          .toLowerCase()
-          .includes(q);
-        if (!matchesQuery) return false;
+  const [page, setPage] = useState(0);
+
+  // Reset page to 0 on filter change
+  useEffect(() => {
+    setPage(0);
+  }, [dataDe, dataAte, selProjeto, selTipo, selMunicipio, query]);
+
+  const { data: paginatedData, isLoading: isListLoading } = useQuery({
+    queryKey: ["atividades-paginated", page, dataDe, dataAte, selProjeto, selTipo, selMunicipio, query],
+    queryFn: async () => {
+      let qBuilder = supabase
+        .from("atividades")
+        .select("*, arquivos_midia(*)", { count: "exact" }) as any;
+
+      if (selProjeto !== "todos") {
+        qBuilder = qBuilder.eq("projeto_id", selProjeto);
       }
-      if (dataDe && a.data < dataDe) return false;
-      if (dataAte && a.data > dataAte) return false;
-      if (selProjeto !== "todos" && a.projetoId !== selProjeto) return false;
-      if (selTipo !== "todos" && a.tipo !== selTipo) return false;
-      if (selMunicipio !== "todos" && a.municipio !== selMunicipio) return false;
-      return true;
-    });
-  }, [ordenadas, query, projetoMap, dataDe, dataAte, selProjeto, selTipo, selMunicipio]);
+      if (selTipo !== "todos") {
+        qBuilder = qBuilder.eq("tipo", selTipo);
+      }
+      if (selMunicipio !== "todos") {
+        qBuilder = qBuilder.eq("municipio", selMunicipio);
+      }
+      if (dataDe) {
+        qBuilder = qBuilder.gte("data", dataDe);
+      }
+      if (dataAte) {
+        qBuilder = qBuilder.lte("data", dataAte);
+      }
 
-  const total = filtered.length;
-  const items = filtered.slice(0, visible);
-  const hasMore = visible < total;
+      if (query.trim()) {
+        const q = query.trim().toLowerCase();
+        let orFilter = `descricao.ilike.%${q}%,tipo.ilike.%${q}%,local.ilike.%${q}%,responsaveis.ilike.%${q}%,municipio.ilike.%${q}%,titulo.ilike.%${q}%`;
+        const matchingProjs = projetos.filter(p => p.nome.toLowerCase().includes(q));
+        if (matchingProjs.length > 0) {
+          orFilter += `,projeto_id.in.(${matchingProjs.map(p => `"${p.id}"`).join(',')})`;
+        }
+        qBuilder = qBuilder.or(orFilter);
+      }
 
-  useEffect(() => {
-    setVisible(PAGE_SIZE);
-  }, [query, dataDe, dataAte, selProjeto, selTipo, selMunicipio]);
+      qBuilder = qBuilder
+        .order("data", { ascending: false })
+        .range(page * 20, (page + 1) * 20 - 1);
 
-  const loadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+      const { data, count, error } = await qBuilder;
+      if (error) throw error;
 
-  const loadMore = useCallback(() => {
-    if (loading || !hasMore) return;
-    setLoading(true);
-    loadTimerRef.current = setTimeout(() => {
-      setVisible((v) => Math.min(v + PAGE_SIZE, total));
-      setLoading(false);
-    }, 200);
-  }, [loading, hasMore, total]);
+      return {
+        data: (data ?? []).map((row: any) => ({
+          id: row.id,
+          projetoId: row.projeto_id ?? "",
+          titulo: row.titulo ?? "",
+          data: row.data ?? "",
+          tipo: row.tipo ?? "",
+          descricao: row.descricao ?? "",
+          local: row.local ?? "",
+          municipio: row.municipio ?? undefined,
+          responsaveis: row.responsaveis ?? "",
+          indicadores: row.indicadores ?? undefined,
+          anexos: row.anexos ?? undefined,
+          arquivosMidia: row.arquivos_midia ?? [],
+        })),
+        count: count ?? 0,
+      };
+    }
+  });
 
-  useEffect(() => {
-    return () => {
-      if (loadTimerRef.current !== null) clearTimeout(loadTimerRef.current);
-    };
-  }, []);
+  const handleDownloadAnexo = async (am: any, projetoId?: string) => {
+    if (am.tipo_arquivo === 'imagem') {
+      window.open(am.url, "_blank");
+      return;
+    }
+    try {
+      let queryBuilder = supabase
+        .from("documentos")
+        .select("storage_path")
+        .eq("titulo", am.nome);
+      if (projetoId) {
+        queryBuilder = queryBuilder.eq("projeto_id", projetoId);
+      }
+      const { data, error } = await queryBuilder.maybeSingle();
+      if (error || !data || !data.storage_path) {
+        window.open(am.url, "_blank");
+        return;
+      }
+      const { data: signedData, error: signedErr } = await supabase.storage
+        .from("documentos")
+        .createSignedUrl(data.storage_path, 60 * 60);
+      if (signedErr || !signedData) {
+        window.open(am.url, "_blank");
+        return;
+      }
+      window.open(signedData.signedUrl, "_blank");
+    } catch (err) {
+      console.error("Erro ao baixar anexo:", err);
+      window.open(am.url, "_blank");
+    }
+  };
 
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const node = sentinelRef.current;
-    if (!node || !hasMore) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) loadMore();
-      },
-      { rootMargin: "200px 0px" }
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [loadMore, hasMore]);
+  const total = paginatedData?.count ?? 0;
+  const items = paginatedData?.data ?? [];
 
   const setF = (k: keyof FormState) => (v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -585,21 +629,23 @@ function AtividadesPage() {
               Atividades recentes
             </h3>
             <Badge variant="secondary">
-              {items.length} de {total}
+              Exibindo {items.length} de {total}
             </Badge>
           </div>
 
-          {items.length === 0 ? (
+          {isListLoading ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">
+              Carregando atividades...
+            </p>
+          ) : items.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">
               {query
                 ? "Nenhuma atividade encontrada para esta busca."
-                : ordenadas.length === 0
-                ? "Carregando atividades..."
                 : "Nenhuma atividade registrada ainda."}
             </p>
           ) : (
             <ol className="relative border-l-2 border-border ml-3 space-y-5">
-              {items.map((a) => {
+              {items.map((a: AtividadeFull) => {
                 const projeto = projetoMap.get(a.projetoId);
                 return (
                   <li key={a.id} className="ml-6">
@@ -667,6 +713,21 @@ function AtividadesPage() {
                           ) : null;
                         })()}
                       </div>
+                      {a.arquivosMidia && a.arquivosMidia.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2 pt-2 border-t border-border/30">
+                          {a.arquivosMidia.map((am: any) => (
+                            <button
+                              key={am.id}
+                              type="button"
+                              onClick={() => handleDownloadAnexo(am, a.projetoId)}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-background/50 hover:bg-background border border-border/60 transition-colors text-[11px] font-medium text-foreground hover:text-primary max-w-[200px]"
+                            >
+                              <span>{am.tipo_arquivo === 'imagem' ? '📷' : '📄'}</span>
+                              <span className="truncate">{am.nome}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </li>
                 );
@@ -674,22 +735,12 @@ function AtividadesPage() {
             </ol>
           )}
 
-          {hasMore && (
-            <>
-              <div ref={sentinelRef} aria-hidden="true" className="h-1" />
-              <div className="mt-6 flex justify-center">
-                <Button
-                  variant="outline"
-                  onClick={loadMore}
-                  disabled={loading}
-                  className="gap-2"
-                >
-                  <ChevronDown className="h-4 w-4" />
-                  {loading ? "Carregando..." : "Carregar mais"}
-                </Button>
-              </div>
-            </>
-          )}
+          <PaginationControls
+            page={page}
+            setPage={setPage}
+            count={total}
+            pageSize={20}
+          />
         </CardContent>
       </Card>
 

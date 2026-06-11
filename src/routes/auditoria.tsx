@@ -38,6 +38,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const Route = createFileRoute("/auditoria")({
   component: AuditoriaPage,
@@ -76,6 +77,7 @@ const TABELAS = [
 const PAGE_SIZE = 30;
 
 function AuditoriaPage() {
+  const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [fTabela, setFTabela] = useState("todos");
   const [fAcao, setFAcao] = useState("todos");
@@ -85,6 +87,7 @@ function AuditoriaPage() {
   // ── Server-side paginated query with filters applied in Supabase ─────────
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["auditoria_logs", fTabela, fAcao, page],
+    enabled: !!user,
     queryFn: async () => {
       let q = supabase
         .from("auditoria")

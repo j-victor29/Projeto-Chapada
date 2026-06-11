@@ -188,6 +188,11 @@ export const deleteProjeto = async (id: string) => {
   emit();
 };
 
+export const refreshProjetos = async () => {
+  initialized = false;
+  await initProjetos();
+};
+
 export const getSnapshot = () => projetos;
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────

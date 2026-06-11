@@ -452,6 +452,38 @@ function AcoesIndependentesPage() {
     setToDelete(a);
   };
 
+  const handleDownloadAnexo = async (am: any, projetoId?: string) => {
+    if (am.tipo_arquivo === 'imagem') {
+      window.open(am.url, "_blank");
+      return;
+    }
+    try {
+      let queryBuilder = supabase
+        .from("documentos")
+        .select("storage_path")
+        .eq("titulo", am.nome);
+      if (projetoId) {
+        queryBuilder = queryBuilder.eq("projeto_id", projetoId);
+      }
+      const { data, error } = await queryBuilder.maybeSingle();
+      if (error || !data || !data.storage_path) {
+        window.open(am.url, "_blank");
+        return;
+      }
+      const { data: signedData, error: signedErr } = await supabase.storage
+        .from("documentos")
+        .createSignedUrl(data.storage_path, 60 * 60);
+      if (signedErr || !signedData) {
+        window.open(am.url, "_blank");
+        return;
+      }
+      window.open(signedData.signedUrl, "_blank");
+    } catch (err) {
+      console.error("Erro ao baixar anexo:", err);
+      window.open(am.url, "_blank");
+    }
+  };
+
   return (
     <AppLayout
       title="Ações Independentes"
@@ -622,6 +654,21 @@ function AcoesIndependentesPage() {
                           ) : null;
                         })()}
                       </div>
+                      {a.arquivosMidia && a.arquivosMidia.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2 pt-2 border-t border-border/30">
+                          {a.arquivosMidia.map((am: any) => (
+                            <button
+                              key={am.id}
+                              type="button"
+                              onClick={() => handleDownloadAnexo(am, a.projetoId)}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-background/50 hover:bg-background border border-border/60 transition-colors text-[11px] font-medium text-foreground hover:text-primary max-w-[200px]"
+                            >
+                              <span>{am.tipo_arquivo === 'imagem' ? '📷' : '📄'}</span>
+                              <span className="truncate">{am.nome}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </li>
                 );

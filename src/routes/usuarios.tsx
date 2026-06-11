@@ -187,6 +187,7 @@ function UsuariosPage() {
     refetch,
   } = useQuery<UsuarioRow[]>({
     queryKey: ["profiles_list"],
+    enabled: !!user,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")

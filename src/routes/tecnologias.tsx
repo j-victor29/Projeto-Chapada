@@ -62,6 +62,7 @@ import { CollaboratorsSection } from "@/components/CollaboratorsSection";
 import { addNotification } from "@/lib/notificationsStore";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const Route = createFileRoute("/tecnologias")({
   component: TecnologiasPage,
@@ -204,6 +205,7 @@ function getLinhaConfig(linha: string): LinhaConfig {
 // ─── Página principal ────────────────────────────────────────────────────────
 function TecnologiasPage() {
   const projetos = useProjetos();
+  const { user } = useAuth();
   const { email: currentEmail, name: currentName } = useCurrentUser();
 
   const [open, setOpen] = useState(false);
@@ -303,9 +305,10 @@ function TecnologiasPage() {
   };
 
   useEffect(() => {
+    if (!user) return; // wait for auth before fetching
     fetchTecnologias();
     fetchCatalogo();
-  }, []);
+  }, [user?.id]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const openCreate = (linha?: string) => {
