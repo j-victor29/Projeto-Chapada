@@ -243,7 +243,7 @@ function RegistroPage() {
                   type="button"
                   onClick={async () => {
                     const { error } = await supabase.auth.resend({
-                      type: "email",
+                      type: "signup",
                       email: email.trim().toLowerCase(),
                     });
                     if (error) toast.error(error.message);

@@ -229,9 +229,9 @@ function EsqueciSenhaPage() {
                 <button
                   type="button"
                   onClick={async () => {
-                    const { error } = await supabase.auth.resend({
-                      type: "email",
+                    const { error } = await supabase.auth.signInWithOtp({
                       email: email.trim().toLowerCase(),
+                      options: { shouldCreateUser: false },
                     });
                     if (error) toast.error(error.message);
                     else toast.success("Código reenviado!");
