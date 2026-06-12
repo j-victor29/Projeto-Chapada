@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Eye, EyeOff, Loader2, Mail, CheckCircle2, XCircle, User } from "lucide-react";
 import { toast } from "sonner";
@@ -13,7 +13,7 @@ export const Route = createFileRoute("/registro")({
 });
 
 
-type Step = "email" | "password" | "done";
+type Step = "email" | "otp" | "password" | "done";
 
 function RegistroPage() {
   const navigate = useNavigate();
@@ -26,85 +26,108 @@ function RegistroPage() {
   const [pwd2, setPwd2] = useState("");
   const [show, setShow] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [verifying, setVerifying] = useState(false);
 
-  const proceedToPassword = (e: React.FormEvent) => {
+  // Step 1: validate domain and send OTP
+  const sendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setEmailError(null);
     const trimmed = email.trim().toLowerCase();
     if (!isAllowedEmail(trimmed)) {
+      toast.error("Apenas e-mails institucionais @ongchapada.org.br são permitidos");
       setEmailError(DOMAIN_ERROR);
       return;
     }
     setEmail(trimmed);
-    setStep("password");
+    setSubmitting(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: trimmed,
+        options: { shouldCreateUser: true },
+      });
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      setStep("otp");
+    } catch (err) {
+      console.error("sendOtp error", err);
+      toast.error("Não foi possível enviar o código. Tente novamente.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
+  // Step 2: verify OTP and advance to password
+  const verifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const token = otp.trim();
+    if (token.length !== 6) {
+      toast.error("Digite o código de 6 dígitos enviado ao seu e-mail.");
+      return;
+    }
+    setVerifying(true);
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email: email.trim().toLowerCase(),
+        token,
+        type: "email",
+      });
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      setStep("password");
+    } catch (err) {
+      console.error("verifyOtp error", err);
+      toast.error("Erro ao verificar o código. Tente novamente.");
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  // Step 3: collect name + password and update user
   const match = pwd.length >= 8 && pwd === pwd2;
   const canCreate = firstName.trim() && lastName.trim() && match;
 
   const createAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canCreate) return;
+
     setSubmitting(true);
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
+      const { error } = await supabase.auth.updateUser({
         password: pwd,
-        options: {
-          data: {
-            full_name: `${firstName.trim()} ${lastName.trim()}`,
-            role: "admin",
-          },
+        data: {
+          full_name: `${capitalize(firstName.trim())} ${capitalize(lastName.trim())}`,
+          role: "admin",
         },
       });
       if (error) {
         toast.error(error.message);
         return;
       }
-      
-      // Clear automatic session from signUp to prevent auto-login redirect
-      await supabase.auth.signOut();
-
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("sb-access-token");
-        localStorage.removeItem("sb-refresh-token");
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith("sb-")) {
-            localStorage.removeItem(key);
-          }
-        }
-      }
-
-      toast.success("Conta criada com sucesso! Faça login para continuar.");
-      navigate({ to: "/login" });
+      setStep("done");
+      setTimeout(() => {
+        navigate({ to: "/login", search: { msg: "registered" } });
+      }, 2000);
     } catch (err) {
       console.error("createAccount error", err);
-      toast.error("Não foi possível criar sua conta. Tente novamente.");
+      toast.error("Não foi possível salvar seus dados. Tente novamente.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  useEffect(() => {
-    if (step !== "done") return;
-    const t = setTimeout(() => {
-      try {
-        navigate({ to: "/login" });
-      } catch (err) {
-        console.error(err);
-        if (typeof window !== "undefined") window.location.href = "/login";
-      }
-    }, 3000);
-    return () => clearTimeout(t);
-  }, [step, navigate]);
-
   const leftMessage =
     step === "email"
       ? "Cadastre seu e-mail institucional para começar."
+      : step === "otp"
+      ? "Insira o código enviado ao seu e-mail institucional."
       : step === "password"
       ? "Complete seus dados e crie uma senha segura."
-      : "Tudo pronto! Redirecionando…";
+      : "Conta verificada! Redirecionando…";
 
   return (
     <AuthLayout
@@ -127,7 +150,7 @@ function RegistroPage() {
       right={
         <>
           {step === "email" && (
-            <form onSubmit={proceedToPassword} className="space-y-5">
+            <form onSubmit={sendOtp} className="space-y-5">
               <div>
                 <h2 className="font-display text-2xl font-bold" style={{ color: "#1A9FD4" }}>
                   Criar conta
@@ -171,6 +194,67 @@ function RegistroPage() {
                 {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
                 Avançar
               </button>
+            </form>
+          )}
+
+          {step === "otp" && (
+            <form onSubmit={verifyCode} className="space-y-5">
+              <div>
+                <h2 className="font-display text-2xl font-bold" style={{ color: "#1A9FD4" }}>
+                  Verifique seu e-mail
+                </h2>
+                <p className="mt-1 text-sm" style={{ color: "#6B8A9A" }}>
+                  Enviamos um código de 6 dígitos para{" "}
+                  <strong style={{ color: "#1A3A4A" }}>{email}</strong>.
+                  Insira-o abaixo para continuar.
+                </p>
+              </div>
+
+              <div>
+                <FieldLabel htmlFor="otp">Código de verificação</FieldLabel>
+                <LightInput
+                  id="otp"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]{6}"
+                  maxLength={6}
+                  placeholder="000000"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  autoComplete="one-time-code"
+                  className="text-center text-xl tracking-[0.4em] font-mono"
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={verifying || otp.length !== 6}
+                className="flex w-full items-center justify-center gap-2 rounded-lg py-3 text-sm font-semibold text-white shadow-md transition-all hover:brightness-110 disabled:opacity-60"
+                style={{ backgroundColor: "#1A9FD4" }}
+              >
+                {verifying && <Loader2 className="h-4 w-4 animate-spin" />}
+                Confirmar código
+              </button>
+
+              <p className="text-center text-xs" style={{ color: "#6B8A9A" }}>
+                Não recebeu?{" "}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const { error } = await supabase.auth.resend({
+                      type: "email",
+                      email: email.trim().toLowerCase(),
+                    });
+                    if (error) toast.error(error.message);
+                    else toast.success("Código reenviado!");
+                  }}
+                  className="font-medium hover:underline"
+                  style={{ color: "#1A9FD4" }}
+                >
+                  Reenviar código
+                </button>
+              </p>
             </form>
           )}
 
@@ -285,21 +369,11 @@ function RegistroPage() {
                 <CheckCircle2 className="h-7 w-7" style={{ color: "#4CAF50" }} />
               </div>
               <h2 className="font-display text-xl font-bold" style={{ color: "#1A9FD4" }}>
-                ✅ Conta criada com sucesso!
+                Conta verificada!
               </h2>
-              <p className="text-sm" style={{ color: "#1A3A4A" }}>
-                Bem-vindo(a), <strong>{capitalize(firstName)} {capitalize(lastName)}</strong>!
-              </p>
               <p className="text-xs" style={{ color: "#6B8A9A" }}>
-                Redirecionando para o login em alguns segundos…
+                Redirecionando para o login…
               </p>
-              <Link
-                to="/login"
-                className="inline-block text-xs font-medium hover:underline"
-                style={{ color: "#1A9FD4" }}
-              >
-                Ir para o login agora
-              </Link>
             </div>
           )}
         </>
