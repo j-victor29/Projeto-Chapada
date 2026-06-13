@@ -860,7 +860,19 @@ function FinanciadoresTab() {
         }
         return errors;
       }}
-      onSave={(s) => upsert.mutateAsync(s)}
+      onSave={async (s) => {
+        const nomeNorm = toTitleCase((s.nome ?? "").trim());
+        // Verificar duplicata de nome (case-insensitive)
+        const { data: dup } = await supabase
+          .from("financiadores")
+          .select("id")
+          .ilike("nome", nomeNorm)
+          .limit(1);
+        if (dup && dup.length > 0 && dup[0].id !== s.id) {
+          throw new Error(`Já existe um financiador com o nome "${nomeNorm}".`);
+        }
+        await upsert.mutateAsync({ ...s, nome: nomeNorm });
+      }}
       onDelete={(id) => del.mutateAsync(id)}
     />
   );
@@ -934,7 +946,20 @@ function CategoriasTab() {
         }
         return errors;
       }}
-      onSave={(s) => upsert.mutateAsync(s)}
+      onSave={async (s) => {
+        const nomeNorm = toTitleCase((s.nome ?? "").trim());
+        // Verificar duplicata de nome+tipo
+        const { data: dup } = await supabase
+          .from("categorias")
+          .select("id")
+          .ilike("nome", nomeNorm)
+          .eq("tipo", s.tipo)
+          .limit(1);
+        if (dup && dup.length > 0 && dup[0].id !== s.id) {
+          throw new Error(`Já existe uma categoria "${nomeNorm}" do tipo "${s.tipo}".`);
+        }
+        await upsert.mutateAsync({ ...s, nome: nomeNorm });
+      }}
       onDelete={(id) => del.mutateAsync(id)}
     />
   );
@@ -981,7 +1006,19 @@ function PublicosTab() {
         }
         return errors;
       }}
-      onSave={(s) => upsert.mutateAsync(s)}
+      onSave={async (s) => {
+        const nomeNorm = toTitleCase((s.nome ?? "").trim());
+        // Verificar duplicata de nome
+        const { data: dup } = await supabase
+          .from("publicos")
+          .select("id")
+          .ilike("nome", nomeNorm)
+          .limit(1);
+        if (dup && dup.length > 0 && dup[0].id !== s.id) {
+          throw new Error(`Já existe um público com o nome "${nomeNorm}".`);
+        }
+        await upsert.mutateAsync({ ...s, nome: nomeNorm });
+      }}
       onDelete={(id) => del.mutateAsync(id)}
     />
   );
@@ -1165,7 +1202,33 @@ function FamiliasTab() {
         }
         return errors;
       }}
-      onSave={(s) => upsert.mutateAsync(s)}
+      onSave={async (s) => {
+        // Verificar duplicata de CPF
+        if (s.cpf && s.cpf.trim()) {
+          const cpfLimpo = s.cpf.replace(/[.-]/g, "").trim();
+          const { data: dupCpf } = await supabase
+            .from("beneficiarios")
+            .select("id, nome_responsavel")
+            .eq("cpf", cpfLimpo)
+            .limit(1);
+          if (dupCpf && dupCpf.length > 0 && dupCpf[0].id !== s.id) {
+            throw new Error(`CPF já cadastrado para a família "${dupCpf[0].nome_responsavel}".`);
+          }
+        }
+        // Verificar duplicata de NIS
+        if (s.nis && s.nis.trim()) {
+          const nisLimpo = s.nis.replace(/[.-]/g, "").trim();
+          const { data: dupNis } = await supabase
+            .from("beneficiarios")
+            .select("id, nome_responsavel")
+            .eq("nis", nisLimpo)
+            .limit(1);
+          if (dupNis && dupNis.length > 0 && dupNis[0].id !== s.id) {
+            throw new Error(`NIS já cadastrado para a família "${dupNis[0].nome_responsavel}".`);
+          }
+        }
+        await upsert.mutateAsync(s);
+      }}
       onDelete={(id) => del.mutateAsync(id)}
     />
   );
@@ -1249,14 +1312,32 @@ function TecnologiasTab() {
 
     setErrors({});
     try {
-      await upsert.mutateAsync({ ...draft, linha_acao: linhaFinal });
+      const nomeNorm = toTitleCase(draft.nome.trim());
+      // Verificar duplicata de nome + linha de ação
+      const { data: dup } = await supabase
+        .from("catalogo_tecnologias")
+        .select("id")
+        .ilike("nome", nomeNorm)
+        .eq("linha_acao", linhaFinal)
+        .limit(1);
+      if (dup && dup.length > 0 && dup[0].id !== draft.id) {
+        toast.error(`Já existe a tecnologia "${nomeNorm}" nessa Linha de Ação.`);
+        setErrors((prev) => ({ ...prev, nome: `Tecnologia "${nomeNorm}" já existe nessa Linha de Ação.` }));
+        return;
+      }
+
+      await upsert.mutateAsync({ ...draft, nome: nomeNorm, linha_acao: linhaFinal });
       toast.success("Tecnologia salva com sucesso!");
       setOpen(false);
       setDraft(BLANK_TECH);
       setNovaLinha("");
       setCriandoLinha(false);
     } catch (e: any) {
-      toast.error(e.message ?? "Erro ao salvar a tecnologia");
+      if (e?.code === "23505") {
+        toast.error("Tecnologia duplicada. Verifique o nome e a linha de ação.");
+      } else {
+        toast.error(e.message ?? "Erro ao salvar a tecnologia");
+      }
     }
   };
 

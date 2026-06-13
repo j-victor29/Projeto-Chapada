@@ -507,6 +507,26 @@ function ProjetosPage() {
       toast.error("Corrija os erros antes de salvar.");
       return;
     }
+
+    // ── Verificação de duplicata: número de contrato ─────────────────────────
+    if (editing.contrato?.trim()) {
+      const contratoNormalizado = editing.contrato.trim().toUpperCase();
+      const { data: existing } = await supabase
+        .from("projetos")
+        .select("id, nome")
+        .ilike("contrato", contratoNormalizado)
+        .limit(1);
+
+      if (existing && existing.length > 0 && existing[0].id !== editing.id) {
+        setFormErrors((prev) => ({
+          ...prev,
+          contrato: `Já existe um projeto com este número de contrato: "${existing[0].nome}".`,
+        }));
+        toast.error("Número de contrato já cadastrado.");
+        return;
+      }
+    }
+
     setFormErrors({});
     setSaving(true);
     try {
@@ -521,8 +541,14 @@ function ProjetosPage() {
         toast.success("Projeto cadastrado.");
       }
       setOpen(false);
-    } catch {
-      toast.error("Erro ao salvar projeto. Tente novamente.");
+    } catch (err: any) {
+      // Trata violação de unique constraint do banco (código 23505)
+      if (err?.code === "23505" && err?.message?.includes("contrato")) {
+        setFormErrors((prev) => ({ ...prev, contrato: "Número de contrato já cadastrado no banco de dados." }));
+        toast.error("Número de contrato duplicado.");
+      } else {
+        toast.error("Erro ao salvar projeto. Tente novamente.");
+      }
     } finally {
       setSaving(false);
     }
