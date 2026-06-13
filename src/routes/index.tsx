@@ -3,7 +3,7 @@ import { lazy, Suspense } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const DashboardPage = lazy(() => import("./index.page"));
+const DashboardPage = lazy(() => import("./-index.page"));
 
 export const Route = createFileRoute("/")({
   component: () => (
