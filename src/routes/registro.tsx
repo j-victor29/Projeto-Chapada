@@ -141,9 +141,10 @@ function RegistroPage() {
           <p className="max-w-xs text-center text-xs text-white/80">{leftMessage}</p>
           <Link
             to="/login"
-            className="rounded-md px-3 py-1.5 text-xs font-medium text-white/90 hover:bg-white/10 hover:underline"
+            className="rounded-md px-3 py-1.5 text-xs font-medium text-black hover:opacity-90 hover:underline"
+            style={{ backgroundColor: "#F5A623" }}
           >
-            ← Voltar para login
+            Voltar para login
           </Link>
         </div>
       }
