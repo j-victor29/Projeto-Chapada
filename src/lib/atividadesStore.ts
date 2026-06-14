@@ -26,6 +26,7 @@ export interface AtividadeFull {
   indicadores?: AtividadeIndicadores;
   editado?: boolean;
   arquivosMidia?: any[];
+  created_by?: string | null;
 }
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -297,6 +298,7 @@ function rowToAtividade(row: any): AtividadeFull {
     indicadores: row.indicadores ?? undefined,
     anexos: anexosMapped,
     arquivosMidia: arquivosMidiaMapped,
+    created_by: row.created_by,
   };
 }
 
@@ -344,6 +346,9 @@ export const initAtividadesIndependentes = async () => {
 export const addAtividade = async (
   a: Omit<AtividadeFull, "id">
 ): Promise<string> => {
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData?.user?.id || null;
+
   const { data, error } = await supabase
     .from("atividades")
     .insert({
@@ -357,6 +362,7 @@ export const addAtividade = async (
       responsaveis: a.responsaveis ? trimText(a.responsaveis) : null,
       indicadores: a.indicadores || null,
       anexos: null,
+      created_by: userId,
     })
     .select()
     .single();

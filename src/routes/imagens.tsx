@@ -69,6 +69,9 @@ import {
 } from "@/lib/ownershipStore";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { CollaboratorsSection } from "@/components/CollaboratorsSection";
+import { useRegistroPermissao } from "@/hooks/useRegistroPermissao";
+import { CollaboratorsModal } from "@/components/CollaboratorsModal";
+import { Users } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -120,6 +123,16 @@ function ImagensPage() {
   const [selMunicipio, setSelMunicipio] = useState("todos");
   const [filtroAtividade, setFiltroAtividade] = useState("todos");
   const [filtroAcaoIndependente, setFiltroAcaoIndependente] = useState("todos");
+
+  const { data: profiles = [] } = useQuery({
+    queryKey: ["profiles_list"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("profiles").select("id, email, full_name");
+      if (error) throw error;
+      return data || [];
+    }
+  });
+  const profilesMap = useMemo(() => new Map(profiles.map(p => [p.id, p])), [profiles]);
 
   const { data: atividadesWithImgs = [] } = useQuery({
     queryKey: ["atividades-with-imgs"],
@@ -267,6 +280,7 @@ function ImagensPage() {
             categoriaId: row.categoria_id ?? undefined,
             categoriaNome: nomeCategoria,
             dataUrl: row.url ?? "",
+            created_by: row.created_by,
           };
         }),
         count: count ?? 0,
@@ -629,70 +643,14 @@ function ImagensPage() {
         <div className="space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {filtered.map((img) => (
-              <Card
+              <ImagemCard
                 key={img.id}
-                className="chapada-card overflow-hidden group cursor-pointer transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 relative"
-              >
-                <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openEdit(img);
-                    }}
-                    className="h-8 w-8 grid place-items-center rounded-md bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
-                    aria-label="Editar imagem"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      requestDelete(img);
-                    }}
-                    className="h-8 w-8 grid place-items-center rounded-md bg-destructive text-destructive-foreground shadow-md hover:bg-destructive/90"
-                    aria-label="Excluir imagem"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-                <div
-                  onClick={() => setSelected(img)}
-                  className="aspect-square relative bg-muted overflow-hidden"
-                >
-                  <img
-                    src={img.url}
-                    alt={`${img.projeto} - ${img.tipo}`}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-                </div>
-                <CardContent className="p-3" onClick={() => setSelected(img)}>
-                  <div className="text-sm font-medium truncate">{img.projeto}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    {img.local} · {img.date}
-                  </div>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    <Badge className="text-[10px] bg-savanna/15 text-savanna border-savanna/30 border">
-                      {img.tipo}
-                    </Badge>
-                    {img.categoriaNome && (
-                      <Badge className="text-[10px] bg-terracotta/15 text-terracotta border-terracotta/30 border">
-                        {img.categoriaNome}
-                      </Badge>
-                    )}
-                  </div>
-                  {(() => {
-                    const o = getOwnership("imagem", img.id);
-                    return o ? (
-                      <div className="text-[10px] text-muted-foreground mt-1">
-                        Criado por {o.ownerName}
-                      </div>
-                    ) : null;
-                  })()}
-                </CardContent>
-              </Card>
+                img={img}
+                setSelected={setSelected}
+                openEdit={openEdit}
+                requestDelete={requestDelete}
+                profilesMap={profilesMap}
+              />
             ))}
           </div>
 
@@ -940,5 +898,117 @@ function ImagensPage() {
         </AlertDialogContent>
       </AlertDialog>
     </AppLayout>
+  );
+}
+
+function ImagemCard({
+  img,
+  setSelected,
+  openEdit,
+  requestDelete,
+  profilesMap,
+}: {
+  img: ImagemItem;
+  setSelected: (img: ImagemItem) => void;
+  openEdit: (img: ImagemItem) => void;
+  requestDelete: (img: ImagemItem) => void;
+  profilesMap: Map<string, any>;
+}) {
+  const { podeEditar, podeExcluir, isCriador } = useRegistroPermissao("arquivos_midia", img.id, img.created_by);
+  const [colabOpen, setColabOpen] = useState(false);
+
+  const creatorProfile = img.created_by ? profilesMap.get(img.created_by) : null;
+  const creatorName = creatorProfile?.full_name || creatorProfile?.email?.split("@")[0] || "Sem dono";
+
+  return (
+    <Card className="chapada-card overflow-hidden group cursor-pointer transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 relative">
+      {isCriador && (
+        <span
+          className="px-2 py-0.5 rounded text-[10px] font-semibold absolute top-2 left-2 z-10"
+          style={{ backgroundColor: "#D4EDDA", color: "#2D5A27" }}
+        >
+          Seu registro
+        </span>
+      )}
+      <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {isCriador && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setColabOpen(true);
+            }}
+            className="h-8 w-8 grid place-items-center rounded-md bg-background text-foreground shadow-md hover:bg-muted"
+            aria-label="Colaboradores"
+          >
+            <Users className="h-4 w-4" />
+          </button>
+        )}
+        {podeEditar && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              openEdit(img);
+            }}
+            className="h-8 w-8 grid place-items-center rounded-md bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
+            aria-label="Editar imagem"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+        )}
+        {podeExcluir && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              requestDelete(img);
+            }}
+            className="h-8 w-8 grid place-items-center rounded-md bg-destructive text-destructive-foreground shadow-md hover:bg-destructive/90"
+            aria-label="Excluir imagem"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      <div
+        onClick={() => setSelected(img)}
+        className="aspect-square relative bg-muted overflow-hidden"
+      >
+        <img
+          src={img.url}
+          alt={`${img.projeto} - ${img.tipo}`}
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+      </div>
+      <CardContent className="p-3" onClick={() => setSelected(img)}>
+        <div className="text-sm font-medium truncate">{img.projeto}</div>
+        <div className="text-xs text-muted-foreground mt-0.5">
+          {img.local} · {img.date}
+        </div>
+        <div className="flex flex-wrap gap-1 mt-2">
+          <Badge className="text-[10px] bg-savanna/15 text-savanna border-savanna/30 border">
+            {img.tipo}
+          </Badge>
+          {img.categoriaNome && (
+            <Badge className="text-[10px] bg-terracotta/15 text-terracotta border-terracotta/30 border">
+              {img.categoriaNome}
+            </Badge>
+          )}
+        </div>
+        <div className="text-[10px] text-muted-foreground mt-1 select-none">
+          Criado por {creatorName}
+        </div>
+      </CardContent>
+      <CollaboratorsModal
+        open={colabOpen}
+        onOpenChange={setColabOpen}
+        tabela="arquivos_midia"
+        registroId={img.id}
+        createdBy={img.created_by}
+        creatorName={creatorName}
+      />
+    </Card>
   );
 }

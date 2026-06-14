@@ -43,7 +43,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, Search, X, Loader2, Check, Star } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, X, Loader2, Check, Star, Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -57,17 +57,6 @@ import { toast } from "sonner";
 import { useGlobalSearch } from "@/contexts/SearchContext";
 import { addNotification } from "@/lib/notificationsStore";
 import {
-  canEdit,
-  denyToast,
-  getOwnership,
-  makeOwnership,
-  removeOwnership,
-  setOwnership,
-  useOwnership,
-} from "@/lib/ownershipStore";
-import { useCurrentUser } from "@/lib/useCurrentUser";
-import { CollaboratorsSection } from "@/components/CollaboratorsSection";
-import {
   useProjetos,
   addProjeto,
   updateProjeto,
@@ -79,6 +68,8 @@ import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useComunidadesAutocomplete, useIbgeAutocomplete, useFavoritos } from "@/lib/autocompleteHooks";
 import { useFormValidation } from "@/hooks/useFormValidation";
+import { useRegistroPermissao } from "@/hooks/useRegistroPermissao";
+import { CollaboratorsModal } from "@/components/CollaboratorsModal";
 
 export const Route = createFileRoute("/projetos")({
   component: () => (
@@ -144,7 +135,16 @@ function ProjetosPage() {
 
   const [search, setSearch] = useState("");
   const { query: globalQuery } = useGlobalSearch();
-  const { email: currentEmail, name: currentName } = useCurrentUser();
+  const { user } = useAuth();
+  const { data: profiles = [] } = useQuery({
+    queryKey: ["profiles_list"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("profiles").select("id, email, full_name");
+      if (error) throw error;
+      return data || [];
+    }
+  });
+  const profilesMap = useMemo(() => new Map(profiles.map(p => [p.id, p])), [profiles]);
   const [fFin, setFFin] = useState<string>("todos");
   const [fMun, setFMun] = useState<string>("todos");
   const [fStatus, setFStatus] = useState<string>("todos");
@@ -178,7 +178,6 @@ function ProjetosPage() {
 
   const { isValid, errors: validationErrors } = useFormValidation(editing, validationRules);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const editingOwnership = useOwnership("projeto", editing.id ?? "");
 
   // ── Estado: Financiadora inline ──────────────────────────────────────────
   const [showNewFinanciador, setShowNewFinanciador] = useState(false);
@@ -492,7 +491,6 @@ function ProjetosPage() {
     setOpen(true);
   };
   const openEdit = (p: ProjetoDB) => {
-    if (!canEdit("projeto", p.id, currentEmail)) { denyToast(); return; }
     setEditing(p);
     setShowNewFinanciador(false);
     setNewFinanciadorNome("");
@@ -531,12 +529,10 @@ function ProjetosPage() {
     setSaving(true);
     try {
       if (editing.id) {
-        if (!canEdit("projeto", editing.id, currentEmail)) { denyToast(); return; }
         await updateProjeto(editing.id, editing);
         toast.success("Projeto atualizado.");
       } else {
-        const novo = await addProjeto(editing as Omit<ProjetoDB, "id">);
-        setOwnership("projeto", novo.id, makeOwnership(currentEmail, currentName));
+        await addProjeto(editing as Omit<ProjetoDB, "id">);
         addNotification({ type: "projeto", title: "Novo projeto cadastrado", body: editing.nome });
         toast.success("Projeto cadastrado.");
       }
@@ -555,10 +551,8 @@ function ProjetosPage() {
   };
 
   const remove = async (id: string) => {
-    if (!canEdit("projeto", id, currentEmail)) { denyToast(); return; }
     try {
       await deleteProjeto(id);
-      removeOwnership("projeto", id);
       toast.success("Projeto removido.");
     } catch {
       toast.error("Erro ao remover projeto.");
@@ -967,16 +961,6 @@ function ProjetosPage() {
                   onChange={(e) => setEditing({ ...editing, publicoCaract: e.target.value })}
                 />
               </div>
-              {editing.id && editingOwnership && (
-                <div className="md:col-span-2">
-                  <CollaboratorsSection
-                    type="projeto"
-                    id={editing.id}
-                    ownership={editingOwnership}
-                    currentEmail={currentEmail}
-                  />
-                </div>
-              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setOpen(false)}>
@@ -1030,28 +1014,27 @@ function ProjetosPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os status</SelectItem>
-              {STATUS?.filter(s => s && String(s).trim() !== "").map((s) => (
-                <SelectItem key={s} value={String(s)}>{s}</SelectItem>
+              {STATUS.map((s) => (
+                <SelectItem key={s} value={s}>{s}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </CardContent>
       </Card>
 
-      {/* Table */}
-      <Card className="shadow-sm">
-        <CardContent className="p-0 overflow-x-auto">
+      <Card>
+        <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Projeto</TableHead>
+                <TableHead>Nome</TableHead>
+                <TableHead>Contrato</TableHead>
                 <TableHead>Financiador</TableHead>
-                <TableHead>Vigência</TableHead>
-                <TableHead>Valor</TableHead>
-                <TableHead>Municípios</TableHead>
-                <TableHead>Comunidades</TableHead>
-                <TableHead>Público</TableHead>
+                <TableHead>Início</TableHead>
+                <TableHead>Término</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Público</TableHead>
+                <TableHead className="text-right">Progresso</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -1066,107 +1049,12 @@ function ProjetosPage() {
                 </TableRow>
               ) : (
                 paginatedFiltered.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell>
-                      <div className="font-medium">{p.nome}</div>
-                      <div className="text-xs text-muted-foreground">{p.contrato}</div>
-                      {(() => {
-                        const o = getOwnership("projeto", p.id);
-                        return o ? (
-                          <div className="text-[10px] text-muted-foreground mt-0.5">
-                            Criado por {o.ownerName}
-                          </div>
-                        ) : null;
-                      })()}
-                    </TableCell>
-                    <TableCell className="text-sm">{p.financiador}</TableCell>
-                    <TableCell className="text-xs whitespace-nowrap min-w-[140px]">
-                      <div>{formatDate(p.inicio)}</div>
-                      <div className="text-muted-foreground">{formatDate(p.termino)}</div>
-                      {(() => {
-                        const pct = calcVigenciaProgress(p.inicio, p.termino);
-                        const done = pct >= 100;
-                        return (
-                          <div className="mt-1.5">
-                            <Progress
-                              value={pct}
-                              className={`h-1 ${done ? "[&>div]:bg-savanna" : ""}`}
-                            />
-                            <div className="text-[10px] text-muted-foreground mt-0.5">
-                              {pct}%
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </TableCell>
-                    <TableCell className="text-sm font-medium whitespace-nowrap">
-                      {formatBRL(p.valor)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1 max-w-48">
-                        {p.municipios.slice(0, 2).map((m) => (
-                          <Badge key={m} variant="secondary" className="text-[10px]">{m}</Badge>
-                        ))}
-                        {p.municipios.length > 2 && (
-                          <Badge variant="secondary" className="text-[10px]">
-                            +{p.municipios.length - 2}
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1 max-w-48">
-                        {(p.comunidadesAtendidas ?? []).slice(0, 2).map((c) => (
-                          <Badge key={c} variant="outline" className="text-[10px]">{c}</Badge>
-                        ))}
-                        {(p.comunidadesAtendidas ?? []).length > 2 && (
-                          <Badge variant="outline" className="text-[10px]">
-                            +{(p.comunidadesAtendidas ?? []).length - 2}
-                          </Badge>
-                        )}
-                        {(p.comunidadesAtendidas ?? []).length === 0 && (
-                          <span className="text-[10px] text-muted-foreground/60 italic">—</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm">{p.publicoQuant}</TableCell>
-                    <TableCell>
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[11px] border ${statusVariant[p.status]}`}
-                      >
-                        {p.status}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button size="icon" variant="ghost" onClick={() => openEdit(p)} className="chapada-icon-btn chapada-icon-btn-primary">
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive chapada-icon-btn chapada-icon-btn-destructive">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                            <AlertDialogContent className="rounded-xl border border-muted bg-card/95 backdrop-blur-md shadow-2xl">
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Remover projeto?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Esta ação não pode ser desfeita. O projeto &quot;{p.nome}&quot; será
-                                removido permanentemente.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => remove(p.id)}>
-                                Remover
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                  <ProjetoRow
+                    key={p.id}
+                    p={p}
+                    openEdit={openEdit}
+                    remove={remove}
+                  />
                 ))
               )}
             </TableBody>
@@ -1183,5 +1071,111 @@ function ProjetosPage() {
         />
       )}
     </AppLayout>
+  );
+}
+
+function ProjetoRow({
+  p,
+  openEdit,
+  remove,
+}: {
+  p: ProjetoDB;
+  openEdit: (p: ProjetoDB) => void;
+  remove: (id: string) => void;
+}) {
+  const { podeEditar, podeExcluir, isCriador } = useRegistroPermissao("projetos", p.id, p.created_by);
+  const [colabOpen, setColabOpen] = useState(false);
+
+  return (
+    <TableRow className="hover:bg-muted/50 group">
+      <TableCell className="font-medium text-primary">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span>{p.nome}</span>
+          {isCriador && (
+            <span
+              className="px-2 py-0.5 rounded text-[10px] font-semibold"
+              style={{ backgroundColor: "#D4EDDA", color: "#2D5A27" }}
+            >
+              Seu registro
+            </span>
+          )}
+        </div>
+      </TableCell>
+      <TableCell>{p.contrato}</TableCell>
+      <TableCell>{p.financiador}</TableCell>
+      <TableCell>
+        {p.inicio ? new Date(p.inicio).toLocaleDateString("pt-BR") : "-"}
+      </TableCell>
+      <TableCell>
+        {p.termino ? new Date(p.termino).toLocaleDateString("pt-BR") : "-"}
+      </TableCell>
+      <TableCell>
+        <Badge variant="outline" className={statusVariant[p.status as ProjetoStatus] || ""}>
+          {p.status}
+        </Badge>
+      </TableCell>
+      <TableCell>
+        {p.publicoQuant > 0 ? p.publicoQuant.toLocaleString("pt-BR") : "-"}
+      </TableCell>
+      <TableCell className="text-right">
+        <Progress value={calcVigenciaProgress(p.inicio, p.termino)} className="w-16 ml-auto" />
+      </TableCell>
+      <TableCell className="text-right">
+        <div className="flex justify-end gap-2">
+          {isCriador && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setColabOpen(true)}
+              title="Colaboradores"
+            >
+              <Users className="h-4 w-4" />
+            </Button>
+          )}
+          {podeEditar && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => openEdit(p)}
+              title="Editar"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          )}
+          {podeExcluir && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10" title="Excluir">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Remover Projeto?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta ação não pode ser desfeita. O projeto &quot;{p.nome}&quot; será
+                    removido permanentemente.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => remove(p.id)}>
+                    Remover
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
+        <CollaboratorsModal
+          open={colabOpen}
+          onOpenChange={setColabOpen}
+          tabela="projetos"
+          registroId={p.id}
+          createdBy={p.created_by}
+          creatorName={p.created_by ? "Criador" : "Sem dono"}
+        />
+      </TableCell>
+    </TableRow>
   );
 }

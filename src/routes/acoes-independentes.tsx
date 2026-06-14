@@ -49,6 +49,7 @@ import {
   Star,
   Search,
   Filter,
+  Users,
 } from "lucide-react";
 import { formatDate } from "@/lib/mockData";
 import { Municipios } from "@/lib/cadastrosStore";
@@ -61,19 +62,11 @@ import {
 } from "@/lib/atividadesStore";
 import { addNotification } from "@/lib/notificationsStore";
 import { useGlobalSearch } from "@/contexts/SearchContext";
-import {
-  canEdit,
-  denyToast,
-  getOwnership,
-  makeOwnership,
-  removeOwnership,
-  setOwnership,
-  useOwnership,
-} from "@/lib/ownershipStore";
-import { useCurrentUser } from "@/lib/useCurrentUser";
-import { CollaboratorsSection } from "@/components/CollaboratorsSection";
+import { useRegistroPermissao } from "@/hooks/useRegistroPermissao";
+import { CollaboratorsModal } from "@/components/CollaboratorsModal";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   useIbgeAutocomplete,
@@ -203,8 +196,16 @@ function AcoesIndependentesPage() {
   const [toDelete, setToDelete] = useState<AtividadeFull | null>(null);
   const [localType, setLocalType] = useState<"comunidade" | "local" | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const { email: currentEmail, name: currentName } = useCurrentUser();
-  const editingOwnership = useOwnership("atividade", editingId ?? "");
+  const { user } = useAuth();
+  const { data: profiles = [] } = useQuery({
+    queryKey: ["profiles_list"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("profiles").select("id, email, full_name");
+      if (error) throw error;
+      return data || [];
+    }
+  });
+  const profilesMap = useMemo(() => new Map(profiles.map(p => [p.id, p])), [profiles]);
 
   // ── Hook de Favoritos ────────────────────────────────────────────────────
   const { favoritos, isFavorito } = useFavoritos();
@@ -380,10 +381,6 @@ function AcoesIndependentesPage() {
   };
 
   const openEdit = (a: AtividadeFull) => {
-    if (!canEdit("atividade", a.id, currentEmail)) {
-      denyToast();
-      return;
-    }
     setEditingId(a.id);
     setForm(toFormState(a));
     setAnexos(a.anexos ?? []);
@@ -424,15 +421,10 @@ function AcoesIndependentesPage() {
     setSaving(true);
     try {
       if (editingId) {
-        if (!canEdit("atividade", editingId, currentEmail)) {
-          denyToast();
-          return;
-        }
         await updateAtividade(editingId, payload);
         toast.success("Ação Independente atualizada.");
       } else {
-        const newId = await addAtividade(payload);
-        setOwnership("atividade", newId, makeOwnership(currentEmail, currentName));
+        await addAtividade(payload);
         addNotification({
           type: "atividade",
           title: "Nova ação independente cadastrada",
@@ -456,14 +448,8 @@ function AcoesIndependentesPage() {
 
   const confirmDelete = async () => {
     if (!toDelete) return;
-    if (!canEdit("atividade", toDelete.id, currentEmail)) {
-      denyToast();
-      setToDelete(null);
-      return;
-    }
     try {
       await deleteAtividade(toDelete.id);
-      removeOwnership("atividade", toDelete.id);
       toast.success("Ação Independente excluída.");
       queryClient.invalidateQueries({ queryKey: ["atividades"] });
     } catch {
@@ -474,10 +460,6 @@ function AcoesIndependentesPage() {
   };
 
   const requestDelete = (a: AtividadeFull) => {
-    if (!canEdit("atividade", a.id, currentEmail)) {
-      denyToast();
-      return;
-    }
     setToDelete(a);
   };
 
@@ -623,83 +605,15 @@ function AcoesIndependentesPage() {
             <ol className="relative border-l-2 border-border ml-3 space-y-5">
               {items.map((a) => {
                 return (
-                  <li key={a.id} className="ml-6">
-                    <span className="absolute -left-[9px] h-4 w-4 rounded-full bg-primary border-2 border-background" />
-                    <div className="bg-muted/40 hover:bg-muted/60 rounded-xl p-4 group transition-all duration-200 border border-transparent hover:border-border/40">
-                      <div className="flex flex-wrap items-center gap-2 mb-2">
-                        <Badge variant="outline">{a.tipo}</Badge>
-                        <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {formatDate(a.data)}
-                        </span>
-                        <div className="ml-auto flex gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 rounded-lg hover:bg-primary/10 hover:text-primary transition-all"
-                            onClick={() => openEdit(a)}
-                            aria-label="Editar"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10 transition-all"
-                            onClick={() => requestDelete(a)}
-                            aria-label="Excluir"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="mt-1">
-                        {a.titulo && (
-                          <h4 className="font-semibold text-sm leading-snug mb-1">{a.titulo}</h4>
-                        )}
-                        <p className="text-sm text-muted-foreground">{a.descricao}</p>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
-                        <span className="inline-flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          {a.municipio ? `${a.municipio} — ${a.local}` : a.local}
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          {a.responsaveis}
-                        </span>
-                        {a.anexos && a.anexos.length > 0 && (
-                          <span className="inline-flex items-center gap-1">
-                            <Paperclip className="h-3 w-3" />
-                            {a.anexos.length} anexo(s)
-                          </span>
-                        )}
-                        {(() => {
-                          const o = getOwnership("atividade", a.id);
-                          return o ? (
-                            <span className="ml-auto text-[10px]">
-                              Criado por {o.ownerName}
-                            </span>
-                          ) : null;
-                        })()}
-                      </div>
-                      {a.arquivosMidia && a.arquivosMidia.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-2 pt-2 border-t border-border/30">
-                          {a.arquivosMidia.map((am: any) => (
-                            <button
-                              key={am.id}
-                              type="button"
-                              onClick={() => handleDownloadAnexo(am, a.projetoId)}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-background/50 hover:bg-background border border-border/60 transition-colors text-[11px] font-medium text-foreground hover:text-primary max-w-[200px]"
-                            >
-                              <span>{am.tipo_arquivo === 'imagem' ? '📷' : '📄'}</span>
-                              <span className="truncate">{am.nome}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </li>
+                  <AtividadeItem
+                    key={a.id}
+                    a={a}
+                    projeto={null}
+                    openEdit={openEdit}
+                    requestDelete={requestDelete}
+                    handleDownloadAnexo={handleDownloadAnexo}
+                    profilesMap={profilesMap}
+                  />
                 );
               })}
             </ol>
@@ -940,16 +854,6 @@ function AcoesIndependentesPage() {
                 </ul>
               )}
             </div>
-            {editingId && editingOwnership && (
-              <div className="md:col-span-2">
-                <CollaboratorsSection
-                  type="atividade"
-                  id={editingId}
-                  ownership={editingOwnership}
-                  currentEmail={currentEmail}
-                />
-              </div>
-            )}
           </div>
 
           <DialogFooter>
@@ -990,5 +894,138 @@ function AcoesIndependentesPage() {
         </AlertDialogContent>
       </AlertDialog>
     </AppLayout>
+  );
+}
+
+function AtividadeItem({
+  a,
+  projeto,
+  openEdit,
+  requestDelete,
+  handleDownloadAnexo,
+  profilesMap,
+}: {
+  a: AtividadeFull;
+  projeto: any;
+  openEdit: (a: AtividadeFull) => void;
+  requestDelete: (a: AtividadeFull) => void;
+  handleDownloadAnexo: (am: any, projId?: string) => void;
+  profilesMap: Map<string, any>;
+}) {
+  const { podeEditar, podeExcluir, isCriador } = useRegistroPermissao("atividades", a.id, a.created_by);
+  const [colabOpen, setColabOpen] = useState(false);
+
+  const creatorProfile = a.created_by ? profilesMap.get(a.created_by) : null;
+  const creatorName = creatorProfile?.full_name || creatorProfile?.email?.split("@")[0] || "Sem dono";
+
+  return (
+    <li className="ml-6">
+      <span className="absolute -left-[9px] h-4 w-4 rounded-full bg-primary border-2 border-background" />
+      <div className="bg-muted/40 hover:bg-muted/60 rounded-xl p-4 group transition-all duration-200 border border-transparent hover:border-border/40">
+        <div className="flex flex-wrap items-center gap-2 mb-2">
+          {projeto && (
+            <Badge className="bg-primary/10 text-primary border border-primary/30 hover:bg-primary/15">
+              {projeto.nome}
+            </Badge>
+          )}
+          <Badge variant="outline">{a.tipo}</Badge>
+          <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
+            <Calendar className="h-3 w-3" />
+            {formatDate(a.data)}
+          </span>
+          {isCriador && (
+            <span
+              className="px-2 py-0.5 rounded text-[10px] font-semibold"
+              style={{ backgroundColor: "#D4EDDA", color: "#2D5A27" }}
+            >
+              Seu registro
+            </span>
+          )}
+          <div className="ml-auto flex gap-1">
+            {isCriador && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 rounded-lg hover:bg-primary/10 hover:text-primary transition-all"
+                onClick={() => setColabOpen(true)}
+                aria-label="Colaboradores"
+              >
+                <Users className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            {podeEditar && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 rounded-lg hover:bg-primary/10 hover:text-primary transition-all"
+                onClick={() => openEdit(a)}
+                aria-label="Editar"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            {podeExcluir && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10 transition-all"
+                onClick={() => requestDelete(a)}
+                aria-label="Excluir"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
+        </div>
+        <div className="mt-1">
+          {a.titulo && (
+            <h4 className="font-semibold text-sm leading-snug mb-1">{a.titulo}</h4>
+          )}
+          <p className="text-sm text-muted-foreground">{a.descricao}</p>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <MapPin className="h-3 w-3" />
+            {a.municipio ? `${a.municipio} — ${a.local}` : a.local}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <User className="h-3 w-3" />
+            {a.responsaveis}
+          </span>
+          {a.anexos && a.anexos.length > 0 && (
+            <span className="inline-flex items-center gap-1">
+              <Paperclip className="h-3 w-3" />
+              {a.anexos.length} anexo(s)
+            </span>
+          )}
+          <span className="ml-auto text-[10px]">
+            Criado por: {creatorName}
+          </span>
+        </div>
+        {a.arquivosMidia && a.arquivosMidia.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2 pt-2 border-t border-border/30">
+            {a.arquivosMidia.map((am: any) => (
+              <button
+                key={am.id}
+                type="button"
+                onClick={() => handleDownloadAnexo(am, a.projetoId)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-background/50 hover:bg-background border border-border/60 transition-colors text-[11px] font-medium text-foreground hover:text-primary max-w-[200px]"
+              >
+                <span>{am.tipo_arquivo === 'imagem' ? '📷' : '📄'}</span>
+                <span className="truncate">{am.nome}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <CollaboratorsModal
+        open={colabOpen}
+        onOpenChange={setColabOpen}
+        tabela="atividades"
+        registroId={a.id}
+        createdBy={a.created_by}
+        creatorName={creatorName}
+      />
+    </li>
   );
 }

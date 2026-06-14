@@ -56,7 +56,7 @@ export function AppLayout({
   children: ReactNode;
 }) {
   const navigate = useNavigate();
-  const { session, loading, user, signOut } = useAuth();
+  const { session, loading, user, signOut, impersonate, clearImpersonation } = useAuth();
   const email = user?.email ?? "";
   const profile = useProfile(email);
   const { query, setQuery } = useGlobalSearch();
@@ -118,6 +118,26 @@ export function AppLayout({
               onChange={(e) => setLocalQuery(e.target.value)}
               className="bg-transparent outline-none text-sm flex-1 placeholder:text-muted-foreground"
             />
+          </div>
+
+          {/* User Impersonation Switcher for testing */}
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-xl bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/30">
+            <span className="text-[10px] font-bold text-green-800 dark:text-green-400 uppercase tracking-wider hidden md:inline">Testar RLS:</span>
+            <select
+              value={user?.id || ""}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === "27e51803-8f32-4b08-a97b-365dd1235815") {
+                  impersonate("sistema@ongchapada.org.br", "27e51803-8f32-4b08-a97b-365dd1235815");
+                } else if (val === "2f6dd0c6-c082-4d76-94c5-eadc984953df") {
+                  impersonate("teste@ongchapada.org.br", "2f6dd0c6-c082-4d76-94c5-eadc984953df");
+                }
+              }}
+              className="bg-transparent text-xs font-semibold text-green-900 dark:text-green-300 outline-none border-none cursor-pointer"
+            >
+              <option value="27e51803-8f32-4b08-a97b-365dd1235815" className="bg-background text-foreground">sistema</option>
+              <option value="2f6dd0c6-c082-4d76-94c5-eadc984953df" className="bg-background text-foreground">teste</option>
+            </select>
           </div>
 
           {/* Notifications */}

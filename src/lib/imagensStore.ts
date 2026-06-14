@@ -15,6 +15,7 @@ export interface ImagemItem {
   categoriaNome?: string; // nome da categoria (para exibição)
   // legacy compat – dataUrl agora é um alias de url
   dataUrl?: string;
+  created_by?: string | null;
 }
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -115,6 +116,7 @@ function rowToImagem(row: any): ImagemItem {
     categoriaId: row.categoria_id ?? undefined,
     categoriaNome: row.nome_categoria ?? undefined,
     dataUrl: row.url ?? "",
+    created_by: row.created_by,
   };
 }
 
@@ -180,6 +182,9 @@ export const addImagem = async (payload: AddImagemPayload): Promise<string> => {
 
   const publicUrl = urlData.publicUrl;
 
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData?.user?.id || null;
+
   // 3. Insert metadata row in arquivos_midia
   const { data: rowData, error: dbError } = await supabase
     .from("arquivos_midia" as any)
@@ -192,6 +197,7 @@ export const addImagem = async (payload: AddImagemPayload): Promise<string> => {
       local: payload.local || null,
       url: publicUrl,
       tipo_arquivo: "imagem",
+      created_by: userId,
     })
     .select("*, projetos(nome), categorias(nome)")
     .single();

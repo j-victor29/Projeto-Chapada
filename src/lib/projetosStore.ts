@@ -17,6 +17,7 @@ export interface ProjetoDB {
   publicoQuant: number;
   publicoCaract: string;
   status: ProjetoStatus;
+  created_by?: string | null;
 }
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -50,6 +51,7 @@ function rowToProjeto(row: any): ProjetoDB {
     publicoQuant: Number(row.publico_quant ?? 0),
     publicoCaract: row.publico_caract ?? "",
     status: (row.status as ProjetoStatus) ?? "Em execução",
+    created_by: row.created_by,
   };
 }
 
@@ -111,6 +113,9 @@ export const addProjeto = async (
   const sanitizedMunicipios = (p.municipios || []).map(trimText);
   const sanitizedComunidades = (p.comunidadesAtendidas || []).map(trimText);
 
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData?.user?.id || null;
+
   const { data, error } = await supabase
     .from("projetos")
     .insert({
@@ -126,6 +131,7 @@ export const addProjeto = async (
       publico_quant: p.publicoQuant,
       publico_caract: sanitizedPublicoCaract || null,
       status: p.status,
+      created_by: userId,
     })
     .select()
     .single();

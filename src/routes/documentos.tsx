@@ -31,6 +31,9 @@ import { addNotification } from "@/lib/notificationsStore";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRegistroPermissao } from "@/hooks/useRegistroPermissao";
+import { CollaboratorsModal } from "@/components/CollaboratorsModal";
+import { Users } from "lucide-react";
 
 export const Route = createFileRoute("/documentos")({
   component: DocumentosPage,
@@ -130,6 +133,16 @@ function DocumentosPage() {
 
   const upload = useUploadDocumento();
   const del = useDeleteDocumento();
+
+  const { data: profiles = [] } = useQuery({
+    queryKey: ["profiles_list"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("profiles").select("id, email, full_name");
+      if (error) throw error;
+      return data || [];
+    }
+  });
+  const profilesMap = useMemo(() => new Map(profiles.map(p => [p.id, p])), [profiles]);
 
   const [open, setOpen] = useState(false);
   const [novaVersao, setNovaVersao] = useState<Documento | null>(null);
@@ -641,120 +654,21 @@ function DocumentosPage() {
         ) : (
           <div className="grid gap-3.5">
             {rootDocs.map((doc) => {
-              const allVersions = versionsOf(doc.id);
-              const totalVersions = allVersions.length;
               return (
-                <Card
+                <DocumentoRow
                   key={doc.id}
-                  className="border border-muted/80 bg-card hover:bg-card/90 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 rounded-xl overflow-hidden group"
-                >
-                  <CardContent className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                        <span className="text-2xl leading-none select-none shrink-0">
-                          {getFileIcon(doc.mime_type, doc.titulo)}
-                        </span>
-                        <span className="font-semibold text-base text-foreground truncate max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl group-hover:text-primary transition-colors duration-200">
-                          {doc.titulo}
-                        </span>
-                        <Badge variant="secondary" className="bg-secondary/40 text-secondary-foreground font-semibold px-2 py-0.5 rounded text-xs select-none">
-                          v{doc.versao}
-                        </Badge>
-                        {doc.categoria_id && catMap.has(doc.categoria_id) && (
-                          <Badge variant="outline" className="border-primary/20 text-primary font-medium px-2 py-0.5 rounded text-[10px] select-none">
-                            {catMap.get(doc.categoria_id)}
-                          </Badge>
-                        )}
-                        {doc.projeto_id && projMap.has(doc.projeto_id) && (
-                          <Badge variant="outline" className="border-muted-foreground/35 text-muted-foreground font-medium px-2 py-0.5 rounded text-[10px] select-none">
-                            {projMap.get(doc.projeto_id)}
-                          </Badge>
-                        )}
-                      </div>
-                      
-                      {doc.descricao && (
-                        <p className="text-sm text-muted-foreground/90 mt-1.5 line-clamp-2 leading-relaxed">
-                          {doc.descricao}
-                        </p>
-                      )}
-
-                      {/* Document Details & Tags */}
-                      <div className="flex flex-wrap items-center gap-3 mt-3 text-xs text-muted-foreground">
-                        <span>Tamanho: {formatBytes(doc.tamanho)}</span>
-                        <span className="w-1 h-1 rounded-full bg-muted-foreground/45" />
-                        <span>Criado: {safeFormatDate(doc.created_at)}</span>
-                        {doc.tags && doc.tags.length > 0 && (
-                          <>
-                            <span className="w-1 h-1 rounded-full bg-muted-foreground/45" />
-                            <div className="flex gap-1 flex-wrap">
-                              {doc.tags.map((t) => (
-                                <Badge key={t} variant="outline" className="text-[9px] bg-background/50 hover:bg-background/80 transition-colors py-0 px-1.5 border-muted font-normal text-muted-foreground select-none">
-                                  #{t}
-                                </Badge>
-                              ))}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Actions Panel */}
-                    <div className="flex items-center gap-1 shrink-0 self-end md:self-center border-t md:border-t-0 pt-3 md:pt-0 border-muted">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => baixar(doc)}
-                        title="Baixar documento"
-                        className="h-9 w-9 rounded-lg hover:bg-primary/10 hover:text-primary transition-all duration-200"
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                      
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setNovaVersao(doc);
-                          setDraft({
-                            titulo: doc.titulo,
-                            descricao: doc.descricao ?? "",
-                            categoria_id: doc.categoria_id ?? "none",
-                            projeto_id: doc.projeto_id ?? "none",
-                            file: null,
-                            tags: (doc.tags ?? []).join(", "),
-                          });
-                          setOpen(true);
-                        }}
-                        title="Enviar nova versão"
-                        className="h-9 w-9 rounded-lg hover:bg-secondary/20 hover:text-secondary-foreground text-primary transition-all duration-200"
-                      >
-                        <History className="h-4 w-4" />
-                      </Button>
-
-                      {totalVersions > 1 && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setViewingVersions(doc)}
-                          title="Histórico de versões"
-                          className="h-9 w-9 rounded-lg hover:bg-accent hover:text-accent-foreground text-foreground transition-all duration-200"
-                        >
-                          <GitBranch className="h-4 w-4 text-purple-600" />
-                        </Button>
-                      )}
-
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setToDelete(doc)}
-                        title="Excluir documento"
-                        className="h-9 w-9 rounded-lg hover:bg-destructive/10 text-destructive hover:text-destructive transition-all duration-200"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                  doc={doc}
+                  catMap={catMap}
+                  projMap={projMap}
+                  baixar={baixar}
+                  setNovaVersao={setNovaVersao}
+                  setDraft={setDraft}
+                  setOpen={setOpen}
+                  setViewingVersions={setViewingVersions}
+                  setToDelete={setToDelete}
+                  versionsOf={versionsOf}
+                  profilesMap={profilesMap}
+                />
               );
             })}
           </div>
@@ -838,5 +752,185 @@ function DocumentosPage() {
         </AlertDialogContent>
       </AlertDialog>
     </AppLayout>
+  );
+}
+
+function DocumentoRow({
+  doc,
+  catMap,
+  projMap,
+  baixar,
+  setNovaVersao,
+  setDraft,
+  setOpen,
+  setViewingVersions,
+  setToDelete,
+  versionsOf,
+  profilesMap,
+}: {
+  doc: Documento;
+  catMap: Map<string, string>;
+  projMap: Map<string, string>;
+  baixar: (doc: Documento) => void;
+  setNovaVersao: (doc: Documento | null) => void;
+  setDraft: any;
+  setOpen: (open: boolean) => void;
+  setViewingVersions: (doc: Documento | null) => void;
+  setToDelete: (doc: Documento | null) => void;
+  versionsOf: (docId: string) => Documento[];
+  profilesMap: Map<string, any>;
+}) {
+  const { podeEditar, podeExcluir, isCriador } = useRegistroPermissao("documentos", doc.id, doc.created_by);
+  const [colabOpen, setColabOpen] = useState(false);
+
+  const allVersions = versionsOf(doc.id);
+  const totalVersions = allVersions.length;
+
+  const creatorProfile = doc.created_by ? profilesMap.get(doc.created_by) : null;
+  const creatorName = creatorProfile?.full_name || creatorProfile?.email?.split("@")[0] || "Sem dono";
+
+  return (
+    <Card className="border border-muted/80 bg-card hover:bg-card/90 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 rounded-xl overflow-hidden group">
+      <CardContent className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1.5">
+            <span className="text-2xl leading-none select-none shrink-0">
+              {getFileIcon(doc.mime_type, doc.titulo)}
+            </span>
+            <span className="font-semibold text-base text-foreground truncate max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl group-hover:text-primary transition-colors duration-200">
+              {doc.titulo}
+            </span>
+            <Badge variant="secondary" className="bg-secondary/40 text-secondary-foreground font-semibold px-2 py-0.5 rounded text-xs select-none">
+              v{doc.versao}
+            </Badge>
+            {isCriador && (
+              <span
+                className="px-2 py-0.5 rounded text-[10px] font-semibold"
+                style={{ backgroundColor: "#D4EDDA", color: "#2D5A27" }}
+              >
+                Seu registro
+              </span>
+            )}
+            {doc.categoria_id && catMap.has(doc.categoria_id) && (
+              <Badge variant="outline" className="border-primary/20 text-primary font-medium px-2 py-0.5 rounded text-[10px] select-none">
+                {catMap.get(doc.categoria_id)}
+              </Badge>
+            )}
+            {doc.projeto_id && projMap.has(doc.projeto_id) && (
+              <Badge variant="outline" className="border-muted-foreground/35 text-muted-foreground font-medium px-2 py-0.5 rounded text-[10px] select-none">
+                {projMap.get(doc.projeto_id)}
+              </Badge>
+            )}
+          </div>
+          
+          {doc.descricao && (
+            <p className="text-sm text-muted-foreground/90 mt-1.5 line-clamp-2 leading-relaxed">
+              {doc.descricao}
+            </p>
+          )}
+
+          {/* Document Details & Tags */}
+          <div className="flex flex-wrap items-center gap-3 mt-3 text-xs text-muted-foreground">
+            <span>Tamanho: {formatBytes(doc.tamanho)}</span>
+            <span className="w-1 h-1 rounded-full bg-muted-foreground/45" />
+            <span>Criado: {safeFormatDate(doc.created_at)}</span>
+            <span className="w-1 h-1 rounded-full bg-muted-foreground/45" />
+            <span>Dono: {creatorName}</span>
+            {doc.tags && doc.tags.length > 0 && (
+              <>
+                <span className="w-1 h-1 rounded-full bg-muted-foreground/45" />
+                <div className="flex gap-1 flex-wrap">
+                  {doc.tags.map((t) => (
+                    <Badge key={t} variant="outline" className="text-[9px] bg-background/50 hover:bg-background/80 transition-colors py-0 px-1.5 border-muted font-normal text-muted-foreground select-none">
+                      #{t}
+                    </Badge>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Actions Panel */}
+        <div className="flex items-center gap-1 shrink-0 self-end md:self-center border-t md:border-t-0 pt-3 md:pt-0 border-muted">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => baixar(doc)}
+            title="Baixar documento"
+            className="h-9 w-9 rounded-lg hover:bg-primary/10 hover:text-primary transition-all duration-200"
+          >
+            <Download className="h-4 w-4" />
+          </Button>
+
+          {isCriador && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setColabOpen(true)}
+              title="Colaboradores"
+              className="h-9 w-9 rounded-lg hover:bg-accent hover:text-accent-foreground text-foreground transition-all duration-200"
+            >
+              <Users className="h-4 w-4" />
+            </Button>
+          )}
+          
+          {podeEditar && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setNovaVersao(doc);
+                setDraft({
+                  titulo: doc.titulo,
+                  descricao: doc.descricao ?? "",
+                  categoria_id: doc.categoria_id ?? "none",
+                  projeto_id: doc.projeto_id ?? "none",
+                  file: null,
+                  tags: (doc.tags ?? []).join(", "),
+                });
+                setOpen(true);
+              }}
+              title="Enviar nova versão"
+              className="h-9 w-9 rounded-lg hover:bg-secondary/20 hover:text-secondary-foreground text-primary transition-all duration-200"
+            >
+              <History className="h-4 w-4" />
+            </Button>
+          )}
+
+          {totalVersions > 1 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setViewingVersions(doc)}
+              title="Histórico de versões"
+              className="h-9 w-9 rounded-lg hover:bg-accent hover:text-accent-foreground text-foreground transition-all duration-200"
+            >
+              <GitBranch className="h-4 w-4 text-purple-600" />
+            </Button>
+          )}
+
+          {podeExcluir && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setToDelete(doc)}
+              title="Excluir documento"
+              className="h-9 w-9 rounded-lg hover:bg-destructive/10 text-destructive hover:text-destructive transition-all duration-200"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </CardContent>
+      <CollaboratorsModal
+        open={colabOpen}
+        onOpenChange={setColabOpen}
+        tabela="documentos"
+        registroId={doc.id}
+        createdBy={doc.created_by}
+        creatorName={creatorName}
+      />
+    </Card>
   );
 }
