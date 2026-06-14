@@ -136,21 +136,54 @@ function makeCrud<T extends { id: string }>(
 
           if (row.id) {
             const { id, created_at, updated_at, ...rest } = payload as any;
-            const { error } = await supabase
+            const { data, error } = await supabase
               .from(table)
               .update(rest)
-              .eq("id", id);
+              .eq("id", id)
+              .select()
+              .single();
             if (error) throw error;
+            return data as T;
           } else {
             const { id, created_at, updated_at, ...rest } = payload as any;
-            const { error } = await supabase
+            const { data, error } = await supabase
               .from(table)
-              .insert(rest);
+              .insert(rest)
+              .select()
+              .single();
             if (error) throw error;
+            return data as T;
           }
         },
-        onSuccess: () => {
+        onSuccess: (data) => {
+          qc.setQueriesData({ queryKey: QK }, (prev: T[] | undefined) => {
+            if (!prev) return prev;
+            const exists = prev.some((item) => item.id === data.id);
+            if (exists) {
+              return prev.map((item) => (item.id === data.id ? data : item));
+            } else {
+              return [...prev, data];
+            }
+          });
+          qc.setQueriesData({ queryKey: [`${key}-paginated`] }, (prev: any) => {
+            if (!prev) return prev;
+            const list = Array.isArray(prev.data) ? prev.data : [];
+            const exists = list.some((item: any) => item.id === data.id);
+            if (exists) {
+              return {
+                ...prev,
+                data: list.map((item: any) => (item.id === data.id ? data : item)),
+              };
+            } else {
+              return {
+                ...prev,
+                data: [...list, data],
+                count: (prev.count ?? 0) + 1,
+              };
+            }
+          });
           qc.invalidateQueries({ queryKey: QK });
+          qc.invalidateQueries({ queryKey: [`${key}-paginated`] });
         },
       });
     },
@@ -161,9 +194,24 @@ function makeCrud<T extends { id: string }>(
         mutationFn: async (id: string) => {
           const { error } = await supabase.from(table).delete().eq("id", id);
           if (error) throw error;
+          return id;
         },
-        onSuccess: () => {
+        onSuccess: (deletedId) => {
+          qc.setQueriesData({ queryKey: QK }, (prev: T[] | undefined) => {
+            if (!prev) return prev;
+            return prev.filter((item) => item.id !== deletedId);
+          });
+          qc.setQueriesData({ queryKey: [`${key}-paginated`] }, (prev: any) => {
+            if (!prev) return prev;
+            const list = Array.isArray(prev.data) ? prev.data : [];
+            return {
+              ...prev,
+              data: list.filter((item: any) => item.id !== deletedId),
+              count: Math.max(0, (prev.count ?? 0) - 1),
+            };
+          });
           qc.invalidateQueries({ queryKey: QK });
+          qc.invalidateQueries({ queryKey: [`${key}-paginated`] });
         },
       });
     },
@@ -215,7 +263,13 @@ export const LinhasAcao = {
         if (error) throw error;
         return data as LinhaAcao;
       },
-      onSuccess: () => qc.invalidateQueries({ queryKey: ["linhas_acao"] }),
+      onSuccess: (data) => {
+        qc.setQueriesData({ queryKey: ["linhas_acao"] }, (prev: LinhaAcao[] | undefined) => {
+          if (!prev) return prev;
+          return [...prev, data];
+        });
+        qc.invalidateQueries({ queryKey: ["linhas_acao"] });
+      },
     });
   },
 };
@@ -242,20 +296,37 @@ export const CatalogoTecnologias = {
       mutationFn: async (row: Partial<CatalogoTecnologia> & { id?: string }) => {
         if (row.id) {
           const { id, created_at, ...rest } = row as any;
-          const { error } = await supabase
+          const { data, error } = await supabase
             .from("tecnologias")
             .update(rest)
-            .eq("id", id);
+            .eq("id", id)
+            .select("id, nome, linha_acao, ativo")
+            .single();
           if (error) throw error;
+          return data as CatalogoTecnologia;
         } else {
           const { id, created_at, ...rest } = row as any;
-          const { error } = await supabase
+          const { data, error } = await supabase
             .from("tecnologias")
-            .insert({ ...rest, ativo: true });
+            .insert({ ...rest, ativo: true })
+            .select("id, nome, linha_acao, ativo")
+            .single();
           if (error) throw error;
+          return data as CatalogoTecnologia;
         }
       },
-      onSuccess: () => qc.invalidateQueries({ queryKey: ["catalogo_tecnologias"] }),
+      onSuccess: (data) => {
+        qc.setQueriesData({ queryKey: ["catalogo_tecnologias"] }, (prev: CatalogoTecnologia[] | undefined) => {
+          if (!prev) return prev;
+          const exists = prev.some((item) => item.id === data.id);
+          if (exists) {
+            return prev.map((item) => (item.id === data.id ? data : item));
+          } else {
+            return [...prev, data];
+          }
+        });
+        qc.invalidateQueries({ queryKey: ["catalogo_tecnologias"] });
+      },
     });
   },
 
@@ -263,13 +334,22 @@ export const CatalogoTecnologias = {
     const qc = useQueryClient();
     return useMutation({
       mutationFn: async (id: string) => {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("tecnologias")
           .update({ ativo: false })
-          .eq("id", id);
+          .eq("id", id)
+          .select("id, nome, linha_acao, ativo")
+          .single();
         if (error) throw error;
+        return data as CatalogoTecnologia;
       },
-      onSuccess: () => qc.invalidateQueries({ queryKey: ["catalogo_tecnologias"] }),
+      onSuccess: (data) => {
+        qc.setQueriesData({ queryKey: ["catalogo_tecnologias"] }, (prev: CatalogoTecnologia[] | undefined) => {
+          if (!prev) return prev;
+          return prev.map((item) => (item.id === data.id ? data : item));
+        });
+        qc.invalidateQueries({ queryKey: ["catalogo_tecnologias"] });
+      },
     });
   },
 
@@ -277,13 +357,22 @@ export const CatalogoTecnologias = {
     const qc = useQueryClient();
     return useMutation({
       mutationFn: async (id: string) => {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("tecnologias")
           .update({ ativo: true })
-          .eq("id", id);
+          .eq("id", id)
+          .select("id, nome, linha_acao, ativo")
+          .single();
         if (error) throw error;
+        return data as CatalogoTecnologia;
       },
-      onSuccess: () => qc.invalidateQueries({ queryKey: ["catalogo_tecnologias"] }),
+      onSuccess: (data) => {
+        qc.setQueriesData({ queryKey: ["catalogo_tecnologias"] }, (prev: CatalogoTecnologia[] | undefined) => {
+          if (!prev) return prev;
+          return prev.map((item) => (item.id === data.id ? data : item));
+        });
+        qc.invalidateQueries({ queryKey: ["catalogo_tecnologias"] });
+      },
     });
   },
 };

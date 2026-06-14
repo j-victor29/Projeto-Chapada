@@ -229,17 +229,23 @@ export const updateImagem = async (
     }
   }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("arquivos_midia" as any)
     .update(updatePayload)
-    .eq("id", id);
+    .eq("id", id)
+    .select("*, projetos(nome), categorias(nome)")
+    .single();
 
-  if (error) {
+  if (error || !data) {
     console.error("[imagensStore] update error:", error);
-    throw error;
+    throw error ?? new Error("Falha ao atualizar metadados da imagem.");
   }
 
-  imagens = imagens.map((i) => (i.id === id ? { ...i, ...patch } : i));
+  const nomeProjeto = (data as any).projetos?.nome ?? patch.projeto ?? "";
+  const nomeCategoria = (data as any).categorias?.nome ?? undefined;
+  const updatedItem = rowToImagem({ ...(data as any), nome_projeto: nomeProjeto, nome_categoria: nomeCategoria });
+
+  imagens = imagens.map((i) => (i.id === id ? updatedItem : i));
   emit();
 };
 

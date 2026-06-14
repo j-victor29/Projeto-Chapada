@@ -108,7 +108,7 @@ export function useUploadDocumento() {
       }
 
       // 3. Insert metadata into public.documentos
-      const { error } = await supabase.from("documentos").insert({
+      const { data, error } = await supabase.from("documentos").insert({
         titulo: input.titulo,
         descricao: input.descricao ?? null,
         categoria_id: input.categoria_id ?? null,
@@ -120,16 +120,33 @@ export function useUploadDocumento() {
         documento_pai_id: input.documento_pai_id ?? null,
         tags: input.tags ?? [],
         created_by: uid,
-      });
+      })
+      .select()
+      .single();
 
       if (error) {
         // Rollback storage upload in case database insert fails
         await supabase.storage.from("documentos").remove([path]);
         throw error;
       }
+      return data as Documento;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      qc.setQueriesData({ queryKey: QK_DOCUMENTOS }, (prev: Documento[] | undefined) => {
+        if (!prev) return prev;
+        return [data, ...prev];
+      });
+      qc.setQueriesData({ queryKey: ["documentos-paginated"] }, (prev: any) => {
+        if (!prev) return prev;
+        const list = Array.isArray(prev.data) ? prev.data : [];
+        return {
+          ...prev,
+          data: [data, ...list],
+          count: (prev.count ?? 0) + 1,
+        };
+      });
       qc.invalidateQueries({ queryKey: QK_DOCUMENTOS });
+      qc.invalidateQueries({ queryKey: ["documentos-paginated"] });
     },
   });
 }
@@ -157,9 +174,24 @@ export function useDeleteDocumento() {
           console.warn("[documentosStore] Warning deleting file from storage:", storageError.message);
         }
       }
+      return doc.id;
     },
-    onSuccess: () => {
+    onSuccess: (deletedId) => {
+      qc.setQueriesData({ queryKey: QK_DOCUMENTOS }, (prev: Documento[] | undefined) => {
+        if (!prev) return prev;
+        return prev.filter((d) => d.id !== deletedId);
+      });
+      qc.setQueriesData({ queryKey: ["documentos-paginated"] }, (prev: any) => {
+        if (!prev) return prev;
+        const list = Array.isArray(prev.data) ? prev.data : [];
+        return {
+          ...prev,
+          data: list.filter((d: any) => d.id !== deletedId),
+          count: Math.max(0, (prev.count ?? 0) - 1),
+        };
+      });
       qc.invalidateQueries({ queryKey: QK_DOCUMENTOS });
+      qc.invalidateQueries({ queryKey: ["documentos-paginated"] });
     },
   });
 }

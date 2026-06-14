@@ -74,8 +74,8 @@ function CrudShell({
   items: any[] | undefined;
   columns: { label: string; key: string }[];
   renderForm: (state: any, setState: (s: any) => void, errors: Record<string, string>) => React.ReactNode;
-  onSave: (s: any) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  onSave: (s: any) => Promise<any>;
+  onDelete: (id: string) => Promise<any>;
   getId: (row: any) => string;
   getRowValues: (row: any) => Record<string, any>;
   blank: any;
