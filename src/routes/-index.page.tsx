@@ -15,6 +15,7 @@ import {
   X,
   AlertTriangle,
   ClipboardList,
+  Zap,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useUserPresence } from "@/hooks/useUserPresence";
@@ -120,6 +121,16 @@ export default function Dashboard() {
   const allAtividadesRaw = useMemo(() => {
     return atividadesVinculadas;
   }, [atividadesVinculadas]);
+
+  // ─── Filtered Independent Actions ───────────────────────────────────────────
+  const filteredAcoesIndependentes = useMemo(() => {
+    return atividadesIndependentes.filter((a) => {
+      if (dataDe && a.data < dataDe) return false;
+      if (dataAte && a.data > dataAte) return false;
+      if (selMunicipio !== "todos" && a.municipio !== selMunicipio) return false;
+      return true;
+    });
+  }, [atividadesIndependentes, dataDe, dataAte, selMunicipio]);
 
   const filteredAtividades = useMemo(() => {
     return allAtividadesRaw.filter((a) => {
@@ -326,6 +337,7 @@ export default function Dashboard() {
   const kpiCards = [
     { label: "Projetos Ativos", value: filteredProjetos.filter(p => p.status === "Em execução").length, icon: FolderKanban, tone: "primary" },
     { label: "Atividades", value: filteredAtividades.length, icon: ClipboardList, tone: "primary" },
+    { label: "Ações Independentes", value: filteredAcoesIndependentes.length, icon: Zap, tone: "ocre" },
     { label: "Famílias Atendidas", value: ind.participantes, icon: Users, tone: "savanna" },
     { label: "Mulheres Beneficiadas", value: ind.mulheres, icon: Heart, tone: "terracotta" },
     { label: "Jovens Atendidos", value: ind.jovens, icon: GraduationCap, tone: "ocre" },
