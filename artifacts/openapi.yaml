@@ -1,0 +1,232 @@
+openapi: 3.0.3
+info:
+  title: API Supabase - Sistema CHAPADA
+  description: Documentação dos endpoints REST auto-gerados e endpoints de autenticação utilizados no Sistema de Gestão da ONG CHAPADA.
+  version: 1.0.0
+servers:
+  - url: https://vaibjtbayfpmvxxbtuxi.supabase.co
+    description: Servidor de Produção Supabase
+paths:
+  /auth/v1/signup:
+    post:
+      summary: Criar nova conta de usuário (Técnico/Administrador)
+      tags:
+        - Autenticação
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                data:
+                  type: object
+                  properties:
+                    full_name:
+                      type: string
+                    is_admin:
+                      type: boolean
+      responses:
+        '200':
+          description: Registro realizado com sucesso. Perfil associado criado via trigger de banco de dados.
+        '400':
+          description: Dados inválidos ou e-mail já cadastrado.
+
+  /auth/v1/token:
+    post:
+      summary: Autenticar usuário com E-mail e Senha (Login)
+      tags:
+        - Autenticação
+      parameters:
+        - name: grant_type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [password]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Autenticado com sucesso. Retorna tokens JWT.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  token_type:
+                    type: string
+                  expires_in:
+                    type: integer
+                  refresh_token:
+                    type: string
+                  user:
+                    type: object
+        '400':
+          description: Credenciais incorretas ou inválidas.
+
+  /rest/v1/profiles:
+    get:
+      summary: Listar ou buscar perfis de colaboradores
+      tags:
+        - Perfis
+      parameters:
+        - name: select
+          in: query
+          description: Colunas a serem selecionadas (ex. `*,roles`)
+          schema:
+            type: string
+        - name: email
+          in: query
+          description: Filtrar por e-mail (ex. `eq.admin@ongchapada.org.br`)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista de perfis de usuário.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Profile'
+
+  /rest/v1/projetos:
+    get:
+      summary: Listar projetos (contratos)
+      tags:
+        - Projetos
+      parameters:
+        - name: select
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Filtrar por status (ex. `eq.Em execução`)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista de projetos sociais.
+    post:
+      summary: Criar novo projeto
+      tags:
+        - Projetos
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjetoInput'
+      responses:
+        '201':
+          description: Projeto criado com sucesso.
+
+  /rest/v1/atividades:
+    get:
+      summary: Listar atividades e oficinas executadas
+      tags:
+        - Atividades
+      responses:
+        '200':
+          description: Lista de atividades.
+    post:
+      summary: Cadastrar nova atividade
+      tags:
+        - Atividades
+      responses:
+        '201':
+          description: Atividade inserida.
+
+  /rest/v1/beneficiarios:
+    get:
+      summary: Buscar e listar beneficiários das comunidades rurais
+      tags:
+        - Beneficiários
+      parameters:
+        - name: select
+          in: query
+          schema:
+            type: string
+        - name: nome_responsavel
+          in: query
+          description: Busca textual (ex. `ilike.*Maria*`)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista de beneficiários cadastrados.
+
+components:
+  schemas:
+    Profile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        full_name:
+          type: string
+        is_admin:
+          type: boolean
+        photo_url:
+          type: string
+        role:
+          type: string
+        cargo:
+          type: string
+        last_seen:
+          type: string
+          format: date-time
+    ProjetoInput:
+      type: object
+      required:
+        - nome
+        - contrato
+        - financiador
+        - inicio
+        - termino
+      properties:
+        nome:
+          type: string
+        contrato:
+          type: string
+        financiador:
+          type: string
+        inicio:
+          type: string
+          format: date
+        termino:
+          type: string
+          format: date
+        valor:
+          type: number
+        status:
+          type: string
+          enum: [Em execução, Concluído, Suspenso]
