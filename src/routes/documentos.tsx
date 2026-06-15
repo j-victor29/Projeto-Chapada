@@ -32,8 +32,8 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRegistroPermissao } from "@/hooks/useRegistroPermissao";
-import { CollaboratorsModal } from "@/components/CollaboratorsModal";
-import { Users } from "lucide-react";
+import { CollaboratorsSection } from "@/components/CollaboratorsSection";
+import { denyToast } from "@/lib/ownershipStore";
 
 export const Route = createFileRoute("/documentos")({
   component: DocumentosPage,
@@ -128,6 +128,7 @@ const PAGE_SIZE = 20;
 
 function DocumentosPage() {
   const { session } = useAuth();
+  const user = session?.user;
   const { data: cats } = useCategorias();
   const projs = useProjetos();
 
@@ -155,6 +156,7 @@ function DocumentosPage() {
     projeto_id: string;
     file: File | null;
     tags: string;
+    created_by: string | null;
   }>({
     titulo: "",
     descricao: "",
@@ -162,6 +164,7 @@ function DocumentosPage() {
     projeto_id: "none",
     file: null,
     tags: "",
+    created_by: null,
   });
 
   const [busca, setBusca] = useState("");
@@ -305,6 +308,8 @@ function DocumentosPage() {
     return combined.sort((a, b) => b.versao - a.versao);
   };
 
+  const { podeEditar: canSaveDoc } = useRegistroPermissao("documentos", novaVersao?.id, draft.created_by);
+
   const submit = async () => {
     if (!draft.titulo) {
       toast.error("O título do documento é obrigatório");
@@ -312,6 +317,11 @@ function DocumentosPage() {
     }
     if (!draft.file && !novaVersao) {
       toast.error("Você deve selecionar um arquivo");
+      return;
+    }
+
+    if (novaVersao && !canSaveDoc) {
+      denyToast();
       return;
     }
 
@@ -335,7 +345,7 @@ function DocumentosPage() {
       toast.success(novaVersao ? "Nova versão enviada com sucesso!" : "Documento enviado com sucesso!");
       setOpen(false);
       setNovaVersao(null);
-      setDraft({ titulo: "", descricao: "", categoria_id: "none", projeto_id: "none", file: null, tags: "" });
+      setDraft({ titulo: "", descricao: "", categoria_id: "none", projeto_id: "none", file: null, tags: "", created_by: null });
     } catch (e: any) {
       toast.error(e.message ?? "Falha ao enviar documento");
     }
@@ -377,7 +387,7 @@ function DocumentosPage() {
             setOpen(o);
             if (!o) {
               setNovaVersao(null);
-              setDraft({ titulo: "", descricao: "", categoria_id: "none", projeto_id: "none", file: null, tags: "" });
+              setDraft({ titulo: "", descricao: "", categoria_id: "none", projeto_id: "none", file: null, tags: "", created_by: null });
             }
           }}
         >
@@ -489,7 +499,16 @@ function DocumentosPage() {
                 </div>
               </div>
             </div>
-            <DialogFooter className="gap-2 sm:gap-0 mt-2">
+            
+            <div className="mt-4 border-t pt-4">
+              <CollaboratorsSection
+                tabela="documentos"
+                registro_id={novaVersao?.id || null}
+                created_by={draft.created_by || user?.id || null}
+              />
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0 mt-4">
               <Button variant="outline" onClick={() => setOpen(false)} className="rounded-lg border-muted hover:bg-accent">
                 Cancelar
               </Button>
@@ -781,7 +800,6 @@ function DocumentoRow({
   profilesMap: Map<string, any>;
 }) {
   const { podeEditar, podeExcluir, isCriador } = useRegistroPermissao("documentos", doc.id, doc.created_by);
-  const [colabOpen, setColabOpen] = useState(false);
 
   const allVersions = versionsOf(doc.id);
   const totalVersions = allVersions.length;
@@ -862,41 +880,32 @@ function DocumentoRow({
           >
             <Download className="h-4 w-4" />
           </Button>
-
-          {isCriador && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setColabOpen(true)}
-              title="Colaboradores"
-              className="h-9 w-9 rounded-lg hover:bg-accent hover:text-accent-foreground text-foreground transition-all duration-200"
-            >
-              <Users className="h-4 w-4" />
-            </Button>
-          )}
           
-          {podeEditar && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                setNovaVersao(doc);
-                setDraft({
-                  titulo: doc.titulo,
-                  descricao: doc.descricao ?? "",
-                  categoria_id: doc.categoria_id ?? "none",
-                  projeto_id: doc.projeto_id ?? "none",
-                  file: null,
-                  tags: (doc.tags ?? []).join(", "),
-                });
-                setOpen(true);
-              }}
-              title="Enviar nova versão"
-              className="h-9 w-9 rounded-lg hover:bg-secondary/20 hover:text-secondary-foreground text-primary transition-all duration-200"
-            >
-              <History className="h-4 w-4" />
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              if (!podeEditar) {
+                denyToast();
+                return;
+              }
+              setNovaVersao(doc);
+              setDraft({
+                titulo: doc.titulo,
+                descricao: doc.descricao ?? "",
+                categoria_id: doc.categoria_id ?? "none",
+                projeto_id: doc.projeto_id ?? "none",
+                file: null,
+                tags: (doc.tags ?? []).join(", "),
+                created_by: doc.created_by ?? null,
+              });
+              setOpen(true);
+            }}
+            title="Enviar nova versão"
+            className="h-9 w-9 rounded-lg hover:bg-secondary/20 hover:text-secondary-foreground text-primary transition-all duration-200"
+          >
+            <History className="h-4 w-4" />
+          </Button>
 
           {totalVersions > 1 && (
             <Button
@@ -910,27 +919,23 @@ function DocumentoRow({
             </Button>
           )}
 
-          {podeExcluir && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setToDelete(doc)}
-              title="Excluir documento"
-              className="h-9 w-9 rounded-lg hover:bg-destructive/10 text-destructive hover:text-destructive transition-all duration-200"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              if (!podeExcluir) {
+                denyToast();
+                return;
+              }
+              setToDelete(doc);
+            }}
+            title="Excluir documento"
+            className="h-9 w-9 rounded-lg hover:bg-destructive/10 text-destructive hover:text-destructive transition-all duration-200"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
       </CardContent>
-      <CollaboratorsModal
-        open={colabOpen}
-        onOpenChange={setColabOpen}
-        tabela="documentos"
-        registroId={doc.id}
-        createdBy={doc.created_by}
-        creatorName={creatorName}
-      />
     </Card>
   );
 }

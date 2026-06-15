@@ -70,6 +70,8 @@ import { useComunidadesAutocomplete, useIbgeAutocomplete, useFavoritos } from "@
 import { useFormValidation } from "@/hooks/useFormValidation";
 import { useRegistroPermissao } from "@/hooks/useRegistroPermissao";
 import { CollaboratorsModal } from "@/components/CollaboratorsModal";
+import { CollaboratorsSection } from "@/components/CollaboratorsSection";
+import { denyToast } from "@/lib/ownershipStore";
 
 export const Route = createFileRoute("/projetos")({
   component: () => (
@@ -499,10 +501,17 @@ function ProjetosPage() {
     setOpen(true);
   };
 
+  const { podeEditar: canSave } = useRegistroPermissao("projetos", editing?.id, editing?.created_by);
+
   const save = async () => {
     if (!isValid) {
       setFormErrors(validationErrors);
       toast.error("Corrija os erros antes de salvar.");
+      return;
+    }
+
+    if (editing.id && !canSave) {
+      denyToast();
       return;
     }
 
@@ -962,7 +971,16 @@ function ProjetosPage() {
                 />
               </div>
             </div>
-            <DialogFooter>
+
+            <div className="mt-4 border-t pt-4">
+              <CollaboratorsSection
+                tabela="projetos"
+                registro_id={editing.id || null}
+                created_by={editing.created_by || user?.id || null}
+              />
+            </div>
+
+            <DialogFooter className="mt-4">
               <Button variant="outline" onClick={() => setOpen(false)}>
                 Cancelar
               </Button>
@@ -1132,17 +1150,21 @@ function ProjetoRow({
               <Users className="h-4 w-4" />
             </Button>
           )}
-          {podeEditar && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => openEdit(p)}
-              title="Editar"
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
-          )}
-          {podeExcluir && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              if (!podeEditar) {
+                denyToast();
+                return;
+              }
+              openEdit(p);
+            }}
+            title="Editar"
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          {podeExcluir ? (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10" title="Excluir">
@@ -1165,6 +1187,18 @@ function ProjetoRow({
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+          ) : (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-destructive hover:bg-destructive/10"
+              title="Excluir"
+              onClick={() => {
+                denyToast();
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
           )}
         </div>
         <CollaboratorsModal

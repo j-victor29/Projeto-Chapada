@@ -375,4 +375,22 @@ export const CatalogoTecnologias = {
       },
     });
   },
+
+  useDelete: () => {
+    const qc = useQueryClient();
+    return useMutation({
+      mutationFn: async (id: string) => {
+        const { error } = await supabase.from("tecnologias").delete().eq("id", id);
+        if (error) throw error;
+        return id;
+      },
+      onSuccess: (deletedId) => {
+        qc.setQueriesData({ queryKey: ["catalogo_tecnologias"] }, (prev: CatalogoTecnologia[] | undefined) => {
+          if (!prev) return prev;
+          return prev.filter((item) => item.id !== deletedId);
+        });
+        qc.invalidateQueries({ queryKey: ["catalogo_tecnologias"] });
+      },
+    });
+  },
 };

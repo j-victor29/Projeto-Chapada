@@ -104,6 +104,7 @@ const emptyForm = { projetoId: "", projetoNome: "", local: "", tipo: "", date: "
 function ImagensPage() {
   const queryClient = useQueryClient();
   const { session } = useAuth();
+  const user = session?.user;
   const [page, setPage] = useState(0);
 
   const { data: dbMunicipios = [] } = Municipios.useList();
@@ -346,11 +347,10 @@ function ImagensPage() {
     }
   };
 
+  const { podeEditar: canSaveImage } = useRegistroPermissao("arquivos_midia", editing?.id, editing?.created_by);
+  const { podeExcluir: canDeleteImage } = useRegistroPermissao("arquivos_midia", toDelete?.id, toDelete?.created_by);
+
   const openEdit = (img: ImagemItem) => {
-    if (!canEdit("imagem", img.id, currentEmail)) {
-      denyToast();
-      return;
-    }
     setEditing(img);
     // Convert dd/mm/yyyy → yyyy-mm-dd for date input
     let isoDate = img.date;
@@ -370,7 +370,7 @@ function ImagensPage() {
 
   const handleEditSave = async () => {
     if (!editing) return;
-    if (!canEdit("imagem", editing.id, currentEmail)) {
+    if (!canSaveImage) {
       denyToast();
       return;
     }
@@ -398,16 +398,12 @@ function ImagensPage() {
   };
 
   const requestDelete = (img: ImagemItem) => {
-    if (!canEdit("imagem", img.id, currentEmail)) {
-      denyToast();
-      return;
-    }
     setToDelete(img);
   };
 
   const handleDelete = async () => {
     if (!toDelete) return;
-    if (!canEdit("imagem", toDelete.id, currentEmail)) {
+    if (!canDeleteImage) {
       denyToast();
       setToDelete(null);
       return;
@@ -776,14 +772,13 @@ function ImagensPage() {
                 onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
               />
             </div>
-            {isEditMode && editing && editingOwnership && (
+            <div className="mt-4 border-t pt-4">
               <CollaboratorsSection
-                type="imagem"
-                id={editing.id}
-                ownership={editingOwnership}
-                currentEmail={currentEmail}
+                tabela="arquivos_midia"
+                registro_id={editing?.id || null}
+                created_by={editing?.created_by || user?.id || null}
               />
-            )}
+            </div>
           </div>
           <DialogFooter>
             <Button
@@ -944,32 +939,36 @@ function ImagemCard({
             <Users className="h-4 w-4" />
           </button>
         )}
-        {podeEditar && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              openEdit(img);
-            }}
-            className="h-8 w-8 grid place-items-center rounded-md bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
-            aria-label="Editar imagem"
-          >
-            <Pencil className="h-4 w-4" />
-          </button>
-        )}
-        {podeExcluir && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              requestDelete(img);
-            }}
-            className="h-8 w-8 grid place-items-center rounded-md bg-destructive text-destructive-foreground shadow-md hover:bg-destructive/90"
-            aria-label="Excluir imagem"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!podeEditar) {
+              denyToast();
+              return;
+            }
+            openEdit(img);
+          }}
+          className="h-8 w-8 grid place-items-center rounded-md bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
+          aria-label="Editar imagem"
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!podeExcluir) {
+              denyToast();
+              return;
+            }
+            requestDelete(img);
+          }}
+          className="h-8 w-8 grid place-items-center rounded-md bg-destructive text-destructive-foreground shadow-md hover:bg-destructive/90"
+          aria-label="Excluir imagem"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
       </div>
       <div
         onClick={() => setSelected(img)}

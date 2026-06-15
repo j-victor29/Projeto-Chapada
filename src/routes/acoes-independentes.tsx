@@ -64,6 +64,8 @@ import { addNotification } from "@/lib/notificationsStore";
 import { useGlobalSearch } from "@/contexts/SearchContext";
 import { useRegistroPermissao } from "@/hooks/useRegistroPermissao";
 import { CollaboratorsModal } from "@/components/CollaboratorsModal";
+import { CollaboratorsSection } from "@/components/CollaboratorsSection";
+import { denyToast } from "@/lib/ownershipStore";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
@@ -104,6 +106,7 @@ const emptyForm = {
   povosOriginarios: "",
   comunidadesTradicionais: "",
   tecnologiasSociais: "",
+  created_by: null as string | null,
 };
 
 type FormState = typeof emptyForm;
@@ -130,6 +133,7 @@ const toFormState = (a: AtividadeFull): FormState => ({
   povosOriginarios: String(a.indicadores?.povosOriginarios ?? ""),
   comunidadesTradicionais: String(a.indicadores?.comunidadesTradicionais ?? ""),
   tecnologiasSociais: String(a.indicadores?.tecnologiasSociais ?? ""),
+  created_by: a.created_by ?? null,
 });
 
 function AcoesIndependentesPage() {
@@ -390,10 +394,16 @@ function AcoesIndependentesPage() {
     setOpen(true);
   };
 
+  const { podeEditar: canSave } = useRegistroPermissao("atividades", editingId || undefined, form.created_by);
+
   const handleSave = async () => {
     if (!isValid) {
       setFormErrors(validationErrors);
       toast.error("Corrija os erros antes de salvar.");
+      return;
+    }
+    if (editingId && !canSave) {
+      denyToast();
       return;
     }
     setFormErrors({});
@@ -856,6 +866,14 @@ function AcoesIndependentesPage() {
             </div>
           </div>
 
+          <div className="mt-4 border-t pt-4">
+            <CollaboratorsSection
+              tabela="atividades"
+              registro_id={editingId || null}
+              created_by={form.created_by || user?.id || null}
+            />
+          </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancelar
@@ -953,28 +971,36 @@ function AtividadeItem({
                 <Users className="h-3.5 w-3.5" />
               </Button>
             )}
-            {podeEditar && (
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7 rounded-lg hover:bg-primary/10 hover:text-primary transition-all"
-                onClick={() => openEdit(a)}
-                aria-label="Editar"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
-            )}
-            {podeExcluir && (
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10 transition-all"
-                onClick={() => requestDelete(a)}
-                aria-label="Excluir"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            )}
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7 rounded-lg hover:bg-primary/10 hover:text-primary transition-all"
+              onClick={() => {
+                if (!podeEditar) {
+                  denyToast();
+                  return;
+                }
+                openEdit(a);
+              }}
+              aria-label="Editar"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10 transition-all"
+              onClick={() => {
+                if (!podeExcluir) {
+                  denyToast();
+                  return;
+                }
+                requestDelete(a);
+              }}
+              aria-label="Excluir"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
           </div>
         </div>
         <div className="mt-1">

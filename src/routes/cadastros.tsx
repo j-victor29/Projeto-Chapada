@@ -1246,6 +1246,7 @@ function TecnologiasTab() {
   const upsert = CatalogoTecnologias.useUpsert();
   const deactivate = CatalogoTecnologias.useDeactivate();
   const reactivate = CatalogoTecnologias.useReactivate();
+  const del = CatalogoTecnologias.useDelete();
   const createLinha = LinhasAcao.useCreate();
 
   const [open, setOpen] = useState(false);
@@ -1256,6 +1257,7 @@ function TecnologiasTab() {
   const [novaLinha, setNovaLinha] = useState("");
   const [criandoLinha, setCriandoLinha] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const search = useDebounce(localSearch, 300);
 
   const openCreate = () => { setDraft(BLANK_TECH); setNovaLinha(""); setCriandoLinha(false); setErrors({}); setOpen(true); };
@@ -1504,42 +1506,15 @@ function TecnologiasTab() {
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    {row.ativo === false ? (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Reativar tecnologia"
-                        className="h-8 w-8 hover:bg-emerald-500/10 text-muted-foreground hover:text-emerald-600"
-                        onClick={async () => {
-                          try {
-                            await reactivate.mutateAsync(row.id);
-                            toast.success("Tecnologia reativada com sucesso!");
-                          } catch (e: any) {
-                            toast.error(e.message ?? "Erro ao reativar");
-                          }
-                        }}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Desativar tecnologia (não exclui o histórico)"
-                        className="h-8 w-8 hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                        onClick={async () => {
-                          if (!confirm(`Desativar "${row.nome}"? Ela deixará de aparecer no select de /tecnologias, mas o histórico de registros será preservado.`)) return;
-                          try {
-                            await deactivate.mutateAsync(row.id);
-                            toast.success("Tecnologia desativada. O histórico foi preservado.");
-                          } catch (e: any) {
-                            toast.error(e.message ?? "Erro ao desativar");
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Excluir permanentemente"
+                      className="h-8 w-8 hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                      onClick={() => setDeleteId(row.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -1553,6 +1528,37 @@ function TecnologiasTab() {
             </tbody>
           </table>
         </div>
+
+        <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
+          <AlertDialogContent className="rounded-xl border border-muted bg-card/95 backdrop-blur-md shadow-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir registro?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir este registro? Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={async () => {
+                  if (!deleteId) return;
+                  try {
+                    await del.mutateAsync(deleteId);
+                    toast.success("Registro excluído com sucesso!");
+                  } catch (e: any) {
+                    toast.error(e.message ?? "Erro ao excluir o registro");
+                  } finally {
+                    setDeleteId(null);
+                  }
+                }}
+              >
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
       </CardContent>
     </Card>
   );
