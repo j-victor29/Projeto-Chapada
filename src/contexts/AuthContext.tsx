@@ -10,9 +10,6 @@ type AuthContextType = {
   user: User | null;
   loading: boolean;
   signOut: () => Promise<void>;
-  impersonate: (email: string, id: string) => void;
-  clearImpersonation: () => void;
-  isImpersonating: boolean;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -20,9 +17,6 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   signOut: async () => {},
-  impersonate: () => {},
-  clearImpersonation: () => {},
-  isImpersonating: false,
 });
 
 /** Refreshes all custom stores that rely on Supabase auth. */
@@ -35,19 +29,14 @@ function refreshAllStores() {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [impersonated, setImpersonated] = useState<{ email: string; id: string } | null>(() => {
-    try {
-      const stored = localStorage.getItem("chapada.impersonated");
-      return stored ? JSON.parse(stored) : null;
-    } catch {
-      return null;
-    }
-  });
 
   // Track whether we've already triggered the initial store hydration
   const didHydrate = useRef(false);
 
   useEffect(() => {
+    // Clean up any leftover impersonation data from development
+    localStorage.removeItem("chapada.impersonated");
+
     // Subscribe to auth changes FIRST so we don't miss events that fire
     // synchronously during getSession() resolution.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
@@ -78,35 +67,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const impersonate = (email: string, id: string) => {
-    const val = { email, id };
-    setImpersonated(val);
-    localStorage.setItem("chapada.impersonated", JSON.stringify(val));
-    refreshAllStores();
-  };
-
-  const clearImpersonation = () => {
-    setImpersonated(null);
-    localStorage.removeItem("chapada.impersonated");
-    refreshAllStores();
-  };
-
-  const activeUser = impersonated
-    ? ({ id: impersonated.id, email: impersonated.email } as User)
-    : (session?.user ?? null);
-
   return (
     <AuthContext.Provider
       value={{
         session,
-        user: activeUser,
+        user: session?.user ?? null,
         loading,
         signOut: async () => {
           await supabase.auth.signOut();
         },
-        impersonate,
-        clearImpersonation,
-        isImpersonating: !!impersonated,
       }}
     >
       {children}
@@ -115,4 +84,3 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 }
 
 export const useAuth = () => useContext(AuthContext);
-

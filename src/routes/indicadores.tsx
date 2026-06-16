@@ -3,6 +3,7 @@ import { useRef, useMemo, useState, useEffect } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import {
   FileDown,
   FileSpreadsheet,
@@ -145,12 +146,13 @@ function sectionTitle(doc: jsPDF, title: string, y: number): number {
   return y + 12;
 }
 
-// ── Progress bar color ─────────────────────────────────────────────────────────
-function progressColor(pct: number): string {
-  if (pct > 90) return "#E53E3E";
-  if (pct > 75) return "#F5A623";
-  return "#2D5A27";
-}
+// ── Status badge classes (equal to /projetos) ──────────────────────────────────
+const statusVariantIndicadores: Record<string, string> = {
+  "Planejamento": "bg-terracotta/15 text-terracotta border-terracotta/30",
+  "Em execução": "bg-savanna/15 text-savanna border-savanna/30",
+  "Concluído": "bg-primary/10 text-primary border-primary/30",
+  "Suspenso": "bg-destructive/15 text-destructive border-destructive/30",
+};
 
 // ── KPI Card ───────────────────────────────────────────────────────────────────
 interface KpiCardProps {
@@ -163,20 +165,24 @@ interface KpiCardProps {
 
 function KpiCard({ label, value, sub, icon: Icon, tone }: KpiCardProps) {
   return (
-    <Card className="border-border/60 border-t-4 border-t-primary hover:shadow-[var(--shadow-soft)] transition-shadow">
-      <CardContent className="p-4 md:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground font-medium">{label}</div>
-            <div className="mt-2 text-2xl md:text-3xl font-display font-semibold text-foreground">
+    <Card className="bg-card border-2 border-[#E1F1F8] dark:border-border border-t-4 border-t-[#1A9FD4] dark:border-t-[#1A9FD4] rounded-[12px] shadow-sm hover:border-[#1A9FD4]/40 transition-colors">
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between">
+          <div className="flex flex-col h-full justify-between">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
+              {label}
+            </div>
+            <div className="text-[34px] font-bold text-foreground font-[family:var(--font-display)] leading-[1] tracking-tight mb-1">
               {value.toLocaleString("pt-BR")}
             </div>
-            <div className="text-[10px] text-muted-foreground mt-0.5">{sub}</div>
+            <div className="text-[11px] text-muted-foreground opacity-80">
+              {sub}
+            </div>
           </div>
           <div
-            className={`h-10 w-10 rounded-xl grid place-items-center shrink-0 ${toneClass[tone] || "bg-accent"}`}
+            className={`h-[42px] w-[42px] rounded-2xl grid place-items-center shrink-0 ${toneClass[tone] || "bg-accent"}`}
           >
-            <Icon className="h-5 w-5" />
+            <Icon className="h-[20px] w-[20px]" strokeWidth={2} />
           </div>
         </div>
       </CardContent>
@@ -199,19 +205,11 @@ function ProjectRow({ projeto, atividades, isExpanded, onToggle }: ProjectRowPro
   const totalDays = Math.max(1, (end.getTime() - start.getTime()) / 86400000);
   const elapsed = Math.min(totalDays, Math.max(0, (now.getTime() - start.getTime()) / 86400000));
   const pct = Math.round((elapsed / totalDays) * 100);
-  const color = progressColor(pct);
 
   const projPart = atividades.reduce((acc, a) => acc + (a.indicadores?.participantes ?? 0), 0);
   const projMulh = atividades.reduce((acc, a) => acc + (a.indicadores?.mulheres ?? 0), 0);
   const projJov = atividades.reduce((acc, a) => acc + (a.indicadores?.jovens ?? 0), 0);
   const projQui = atividades.reduce((acc, a) => acc + (a.indicadores?.quilombolas ?? 0), 0);
-
-  const statusBg: Record<string, string> = {
-    "Em execução": "bg-green-100 text-green-800",
-    "Concluído": "bg-blue-100 text-blue-800",
-    "Planejamento": "bg-yellow-100 text-yellow-800",
-    "Suspenso": "bg-red-100 text-red-800",
-  };
 
   return (
     <>
@@ -224,15 +222,10 @@ function ProjectRow({ projeto, atividades, isExpanded, onToggle }: ProjectRowPro
           <div className="text-[11px] text-muted-foreground">{projeto.contrato}</div>
         </td>
         <td className="py-3 px-4 text-sm text-muted-foreground">{projeto.financiador || "—"}</td>
-        <td className="py-3 px-4 min-w-[160px]">
+        <td className="py-3 px-4 min-w-[180px]">
           <div className="flex items-center gap-2">
-            <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all"
-                style={{ width: `${pct}%`, backgroundColor: color }}
-              />
-            </div>
-            <span className="text-xs font-semibold" style={{ color }}>{pct}%</span>
+            <Progress value={pct} className="flex-1 h-2" />
+            <span className="text-xs font-semibold text-muted-foreground w-8 text-right">{pct}%</span>
           </div>
           <div className="text-[10px] text-muted-foreground mt-0.5">
             {formatDate(projeto.inicio)} → {formatDate(projeto.termino)}
@@ -241,7 +234,7 @@ function ProjectRow({ projeto, atividades, isExpanded, onToggle }: ProjectRowPro
         <td className="py-3 px-4 text-center text-sm font-semibold">{projPart.toLocaleString("pt-BR")}</td>
         <td className="py-3 px-4 text-center text-sm">{atividades.length}</td>
         <td className="py-3 px-4">
-          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusBg[projeto.status] ?? "bg-muted text-muted-foreground"}`}>
+          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${statusVariantIndicadores[projeto.status] ?? "bg-muted text-muted-foreground border-border"}`}>
             {projeto.status}
           </span>
         </td>
@@ -263,7 +256,7 @@ function ProjectRow({ projeto, atividades, isExpanded, onToggle }: ProjectRowPro
                     { label: "Jovens", val: projJov },
                     { label: "Quilombolas", val: projQui },
                   ].map((item) => (
-                    <div key={item.label} className="bg-white rounded-lg p-2 border border-border/50 text-center">
+                    <div key={item.label} className="bg-card rounded-lg p-2 border border-border/50 text-center">
                       <div className="text-lg font-bold text-primary">{item.val}</div>
                       <div className="text-[10px] text-muted-foreground">{item.label}</div>
                     </div>
@@ -315,6 +308,7 @@ function IndicadoresPage() {
   const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const [metricaMunicipio, setMetricaMunicipio] = useState<"atividades" | "participantes" | "tecnologias">("participantes");
 
   useEffect(() => {
     if (!user) return;
@@ -401,14 +395,14 @@ function IndicadoresPage() {
 
   const kpiLine1 = [
     { label: "PARTICIPANTES", value: ind.participantes, sub: "total geral", icon: Users, tone: "primary" },
-    { label: "MULHERES", value: ind.mulheres, sub: "beneficiadas", icon: Heart, tone: "terracotta" },
-    { label: "JOVENS", value: ind.jovens, sub: "atendidos", icon: GraduationCap, tone: "ocre" },
-    { label: "FAMÍLIAS", value: totalFamilias, sub: "atendidas", icon: Home, tone: "savanna" },
+    { label: "MULHERES BENEF.", value: ind.mulheres, sub: "beneficiadas", icon: Heart, tone: "ocre" },
+    { label: "JOVENS ATEND.", value: ind.jovens, sub: "atendidos", icon: GraduationCap, tone: "terracotta" },
+    { label: "FAMÍLIAS ATEND.", value: totalFamilias, sub: "de tecnologias sociais", icon: Home, tone: "savanna" },
   ];
 
   const kpiLine2 = [
-    { label: "QUILOMBOLAS", value: ind.quilombolas, sub: "público", icon: Flame, tone: "terracotta" },
-    { label: "POVOS ORIG.", value: ind.povosOriginarios, sub: "atendidos", icon: Feather, tone: "ocre" },
+    { label: "QUILOMBOLAS", value: ind.quilombolas, sub: "público", icon: Flame, tone: "ocre" },
+    { label: "POVOS ORIG.", value: ind.povosOriginarios, sub: "atendidos", icon: Feather, tone: "terracotta" },
     { label: "COM. TRADICION.", value: ind.comunidadesTradicionais, sub: "atendidas", icon: Globe, tone: "savanna" },
     { label: "TEC. SOCIAIS", value: totalTecnologiasCount + ind.tecnologiasSociais, sub: "implementadas", icon: Wrench, tone: "primary" },
   ];
@@ -437,13 +431,28 @@ function IndicadoresPage() {
 
   // ── Geographic Distribution ───────────────────────────────────────────────────
   const porMunicipio = useMemo(() => {
-    const allAtividades = [...filteredVinculadas, ...filteredIndependentes];
     const map: Record<string, number> = {};
-    allAtividades.forEach((a) => {
-      const mun = a.municipio?.trim() || "Não informado";
-      const participantes = a.indicadores?.participantes ?? 0;
-      map[mun] = (map[mun] ?? 0) + participantes;
-    });
+
+    if (metricaMunicipio === "tecnologias") {
+      filteredTecnologias.forEach((t) => {
+        const mun = t.municipios?.trim() || "Não informado";
+        const qtd = Number(t.quantidade) || 0;
+        map[mun] = (map[mun] ?? 0) + qtd;
+      });
+    } else {
+      const allAtividades = [...filteredVinculadas, ...filteredIndependentes];
+      allAtividades.forEach((a) => {
+        const mun = a.municipio?.trim() || "Não informado";
+        if (metricaMunicipio === "participantes") {
+          const participantes = a.indicadores?.participantes ?? 0;
+          map[mun] = (map[mun] ?? 0) + participantes;
+        } else {
+          // atividades
+          map[mun] = (map[mun] ?? 0) + 1;
+        }
+      });
+    }
+
     const entries = Object.entries(map)
       .filter(([, v]) => v > 0)
       .sort(([, a], [, b]) => b - a);
@@ -452,9 +461,9 @@ function IndicadoresPage() {
     const top4 = entries.slice(0, 4);
     const outros = entries.slice(4).reduce((acc, [, v]) => acc + v, 0);
     return [...top4.map(([name, value]) => ({ name, value })), { name: "Outros", value: outros }];
-  }, [filteredVinculadas, filteredIndependentes]);
+  }, [filteredVinculadas, filteredIndependentes, filteredTecnologias, metricaMunicipio]);
 
-  const totalMunicipioParticipants = porMunicipio.reduce((acc, m) => acc + m.value, 0);
+  const totalMunicipioValue = porMunicipio.reduce((acc, m) => acc + m.value, 0);
 
   // ── Beneficiarios Bar Chart ───────────────────────────────────────────────────
   const beneficiarios = [
@@ -771,11 +780,11 @@ function IndicadoresPage() {
         {/* ══════════════════════════════════════════════════════════════════════
             BLOCO 1 — 8 KPI Cards
         ══════════════════════════════════════════════════════════════════════ */}
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="space-y-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {kpiLine1.map((k) => <KpiCard key={k.label} {...k} />)}
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {kpiLine2.map((k) => <KpiCard key={k.label} {...k} />)}
           </div>
         </div>
@@ -839,7 +848,7 @@ function IndicadoresPage() {
           {/* Bar chart */}
           <Card className="shadow-sm">
             <CardHeader>
-              <CardTitle className="text-base font-bold" style={{ color: "#2D5A27" }}>Beneficiários por Grupo</CardTitle>
+              <CardTitle className="text-base font-bold text-foreground">Beneficiários por Grupo</CardTitle>
             </CardHeader>
             <CardContent className="h-72">
               {beneficiarios.every((b) => b.total === 0) ? (
@@ -862,46 +871,97 @@ function IndicadoresPage() {
 
           {/* Pie chart + table */}
           <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-base font-bold" style={{ color: "#2D5A27" }}>Distribuição por Município</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-base font-bold text-foreground">Distribuição por Município</CardTitle>
+              <div className="flex bg-muted p-1 rounded-md">
+                <button 
+                  onClick={() => setMetricaMunicipio("participantes")}
+                  className={`px-2 py-1 text-[10px] font-medium rounded-sm transition-colors ${metricaMunicipio === "participantes" ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  Participantes
+                </button>
+                <button 
+                  onClick={() => setMetricaMunicipio("atividades")}
+                  className={`px-2 py-1 text-[10px] font-medium rounded-sm transition-colors ${metricaMunicipio === "atividades" ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  Atividades
+                </button>
+                <button 
+                  onClick={() => setMetricaMunicipio("tecnologias")}
+                  className={`px-2 py-1 text-[10px] font-medium rounded-sm transition-colors ${metricaMunicipio === "tecnologias" ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  Tecnologias
+                </button>
+              </div>
             </CardHeader>
             <CardContent>
               {porMunicipio.length === 0 ? (
                 <div className="h-72 flex items-center justify-center text-sm text-muted-foreground text-center">
-                  Nenhuma atividade com município e participantes registrados.
+                  Nenhum dado registrado para a métrica selecionada.
                 </div>
               ) : (
                 <>
-                  <div className="h-52">
+                  <div className="h-64 mt-2">
                     <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie data={porMunicipio} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
+                      <PieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                        <Pie 
+                           data={porMunicipio} 
+                           dataKey="value" 
+                           nameKey="name" 
+                           cx="50%" 
+                           cy="50%" 
+                           innerRadius={40}
+                           outerRadius={90} 
+                           label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+                             if (percent <= 0.05) return null;
+                             const RADIAN = Math.PI / 180;
+                             const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                             const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                             const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                             return (
+                               <text 
+                                 x={x} 
+                                 y={y} 
+                                 fill="#FFFFFF"
+                                 textAnchor="middle" 
+                                 dominantBaseline="central" 
+                                 fontSize={12} 
+                                 fontWeight="bold"
+                               >
+                                 {`${(percent * 100).toFixed(0)}%`}
+                               </text>
+                             );
+                           }}
+                           labelLine={false}
+                           stroke="none"
+                        >
                           {porMunicipio.map((_, i) => <Cell key={i} fill={MUNICIPIO_COLORS[i % MUNICIPIO_COLORS.length]} />)}
                         </Pie>
                         <Tooltip contentStyle={{ fontSize: "12px", borderRadius: "8px" }} />
+                        <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: "12px", paddingTop: "15px" }} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
                   {/* Mini table */}
-                  <div className="mt-3 border border-border/50 rounded-lg overflow-hidden">
+                  <div className="mt-4 border border-border/50 rounded-lg overflow-hidden">
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="bg-muted/50">
                           <th className="text-left px-3 py-2 font-semibold text-muted-foreground">Município</th>
-                          <th className="text-center px-3 py-2 font-semibold text-muted-foreground">Participantes</th>
-                          <th className="text-center px-3 py-2 font-semibold text-muted-foreground">% do Total</th>
+                          <th className="text-center px-3 py-2 font-semibold text-muted-foreground">Total</th>
+                          <th className="text-center px-3 py-2 font-semibold text-muted-foreground">%</th>
                         </tr>
                       </thead>
                       <tbody>
                         {porMunicipio.map((m, i) => (
-                          <tr key={m.name} className={i % 2 === 0 ? "bg-white" : "bg-muted/20"}>
+                          <tr key={m.name} className={i % 2 === 0 ? "bg-background" : "bg-muted/20"}>
                             <td className="px-3 py-1.5 flex items-center gap-1.5">
                               <span className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: MUNICIPIO_COLORS[i % MUNICIPIO_COLORS.length] }} />
                               {m.name}
                             </td>
                             <td className="px-3 py-1.5 text-center font-semibold">{m.value.toLocaleString("pt-BR")}</td>
                             <td className="px-3 py-1.5 text-center text-muted-foreground">
-                              {totalMunicipioParticipants > 0 ? ((m.value / totalMunicipioParticipants) * 100).toFixed(1) + "%" : "—"}
+                              {totalMunicipioValue > 0 ? ((m.value / totalMunicipioValue) * 100).toFixed(1) + "%" : "—"}
                             </td>
                           </tr>
                         ))}
@@ -919,7 +979,7 @@ function IndicadoresPage() {
         ══════════════════════════════════════════════════════════════════════ */}
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle className="text-base font-bold" style={{ color: "#2D5A27" }}>Desempenho por Projeto</CardTitle>
+            <CardTitle className="text-base font-bold text-foreground">Desempenho por Projeto</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {projetosFiltrados.length === 0 ? (
@@ -962,7 +1022,7 @@ function IndicadoresPage() {
         ══════════════════════════════════════════════════════════════════════ */}
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-bold" style={{ color: "#2D5A27" }}>Tecnologias Sociais Implementadas</CardTitle>
+            <CardTitle className="text-base font-bold text-foreground">Tecnologias Sociais Implementadas</CardTitle>
           </CardHeader>
           <CardContent>
             {tecPorLinha.length === 0 ? (
@@ -1007,15 +1067,15 @@ function IndicadoresPage() {
         {/* ══════════════════════════════════════════════════════════════════════
             BLOCO 6 — Resumo Consolidado (rodapé analítico)
         ══════════════════════════════════════════════════════════════════════ */}
-        <Card className="shadow-sm border-t-4" style={{ borderTopColor: "#2D5A27" }}>
+        <Card className="shadow-sm border-2 border-[#E1F1F8] dark:border-border border-t-4 border-t-[#1A9FD4] dark:border-t-[#1A9FD4] rounded-[12px]">
           <CardHeader>
-            <CardTitle className="text-base font-bold" style={{ color: "#2D5A27" }}>Resumo Consolidado</CardTitle>
+            <CardTitle className="text-base font-bold text-foreground">Resumo Consolidado</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               {beneficiarios.map((b) => (
                 <div key={b.grupo} className="text-center p-4 bg-muted/50 rounded-xl border border-border/50 hover:bg-muted/70 transition-colors">
-                  <div className="text-2xl font-display font-semibold text-primary">
+                  <div className="text-2xl font-display font-semibold text-foreground">
                     {b.total.toLocaleString("pt-BR")}
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">{b.grupo}</div>

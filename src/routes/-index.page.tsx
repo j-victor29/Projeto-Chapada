@@ -16,6 +16,8 @@ import {
   AlertTriangle,
   ClipboardList,
   Zap,
+  Home,
+  Globe,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useUserPresence } from "@/hooks/useUserPresence";
@@ -191,6 +193,20 @@ export default function Dashboard() {
     return filteredTecnologias.reduce((acc, t) => acc + (Number(t.quantidade) || 0), 0);
   }, [filteredTecnologias]);
 
+  // ─── Famílias Atendidas: SUM(familias) de tecnologias_sociais ───────────────
+  const totalFamilias = useMemo(() => {
+    return filteredTecnologias.reduce((acc, t) => acc + (Number(t.familias) || 0), 0);
+  }, [filteredTecnologias]);
+
+  // ─── Comunidades Atendidas: COUNT DISTINCT(municipio) ───────────────────────
+  const comunidadesAtendidas = useMemo(() => {
+    const municipiosSet = new Set<string>();
+    filteredAtividades.forEach((a) => {
+      if (a.municipio) municipiosSet.add(a.municipio.trim());
+    });
+    return municipiosSet.size;
+  }, [filteredAtividades]);
+
   // ─── Re-calculate KPIs ──────────────────────────────────────────────────────
   const ind = useMemo(() => {
     return filteredAtividades.reduce(
@@ -334,17 +350,18 @@ export default function Dashboard() {
       .slice(0, 5);
   }, [filteredAtividades]);
 
+  // Cards da Imagem de Referência
   const kpiCards = [
-    { label: "Projetos Ativos", value: filteredProjetos.filter(p => p.status === "Em execução").length, icon: FolderKanban, tone: "primary" },
-    { label: "Atividades", value: filteredAtividades.length, icon: ClipboardList, tone: "primary" },
-    { label: "Ações Independentes", value: filteredAcoesIndependentes.length, icon: Zap, tone: "ocre" },
-    { label: "Famílias Atendidas", value: ind.participantes, icon: Users, tone: "savanna" },
-    { label: "Mulheres Beneficiadas", value: ind.mulheres, icon: Heart, tone: "terracotta" },
-    { label: "Jovens Atendidos", value: ind.jovens, icon: GraduationCap, tone: "ocre" },
-    { label: "Comunidades", value: ind.comunidadesTradicionais, icon: MapPin, tone: "savanna" },
-    { label: "Tecnologias Sociais", value: totalTecnologiasCount + ind.tecnologiasSociais, icon: Wrench, tone: "primary" },
-    { label: "Público Quilombola", value: ind.quilombolas, icon: Flame, tone: "terracotta" },
-    { label: "Povos Originários", value: ind.povosOriginarios, icon: Feather, tone: "ocre" },
+    // Linha 1
+    { label: "PARTICIPANTES", subtext: "total geral", value: ind.participantes, icon: Users, tone: "primary" },
+    { label: "MULHERES BENEF.", subtext: "beneficiadas", value: ind.mulheres, icon: Heart, tone: "ocre" },
+    { label: "JOVENS ATEND.", subtext: "atendidos", value: ind.jovens, icon: GraduationCap, tone: "terracotta" },
+    { label: "FAMÍLIAS ATEND.", subtext: "de tecnologias sociais", value: totalFamilias, icon: Home, tone: "savanna" },
+    // Linha 2
+    { label: "QUILOMBOLAS", subtext: "público", value: ind.quilombolas, icon: Flame, tone: "ocre" },
+    { label: "POVOS ORIG.", subtext: "atendidos", value: ind.povosOriginarios, icon: Feather, tone: "terracotta" },
+    { label: "COM. TRADICION.", subtext: "atendidas", value: ind.comunidadesTradicionais, icon: Globe, tone: "savanna" },
+    { label: "TEC. SOCIAIS", subtext: "implementadas", value: totalTecnologiasCount + ind.tecnologiasSociais, icon: Wrench, tone: "primary" },
   ];
 
   return (
@@ -519,29 +536,32 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* KPIs — Cards do Dashboard */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {kpiCards.map((k) => {
           const Icon = k.icon;
           return (
             <Card
               key={k.label}
-              className="border-border/60 border-t-4 border-t-primary hover:shadow-[var(--shadow-soft)] transition-shadow"
+              className="bg-card border-2 border-[#E1F1F8] dark:border-border border-t-4 border-t-[#1A9FD4] dark:border-t-[#1A9FD4] rounded-[12px] shadow-sm hover:border-[#1A9FD4]/40 transition-colors"
             >
-              <CardContent className="p-4 md:p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between">
+                  <div className="flex flex-col h-full justify-between">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
                       {k.label}
                     </div>
-                    <div className="mt-2 text-2xl md:text-3xl font-display font-semibold">
+                    <div className="text-[34px] font-bold text-foreground font-[family:var(--font-display)] leading-[1] tracking-tight mb-1">
                       {k.value.toLocaleString("pt-BR")}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground opacity-80">
+                      {k.subtext}
                     </div>
                   </div>
                   <div
-                    className={`h-10 w-10 rounded-xl grid place-items-center ${toneClass[k.tone] || "bg-accent"}`}
+                    className={`h-[42px] w-[42px] rounded-2xl grid place-items-center shrink-0 ${toneClass[k.tone] || "bg-accent"}`}
                   >
-                    <Icon className="h-5 w-5" />
+                    <Icon className="h-[20px] w-[20px]" strokeWidth={2} />
                   </div>
                 </div>
               </CardContent>

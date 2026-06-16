@@ -1106,7 +1106,7 @@ function ProjetoRow({
 
   return (
     <TableRow className="hover:bg-muted/50 group">
-      <TableCell className="font-medium text-primary">
+      <TableCell className="font-medium">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span>{p.nome}</span>
           {isCriador && (
