@@ -504,7 +504,9 @@ export const useAtividadesIndependentes = (): AtividadeFull[] => {
 
 export const useAtividadesIndicadores = () => {
   const list = useAtividades();
-  return list.reduce(
+  const independentes = useAtividadesIndependentes();
+  const all = [...list, ...independentes];
+  return all.reduce(
     (acc, a) => {
       const i = a.indicadores;
       if (!i) return acc;

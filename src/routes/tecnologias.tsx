@@ -1232,9 +1232,13 @@ function TecnologiaModal({
       onOpenChange(false);
     } catch (err: any) {
       console.error("ERRO COMPLETO AO SALVAR:", JSON.stringify(err, null, 2));
-      toast.error(
-        `Erro ao salvar tecnologia: ${err.message || JSON.stringify(err)}`
-      );
+      if (err?.code === "23505" || err?.message?.includes("23505") || err?.message?.includes("duplicate key")) {
+        toast.error("Já existe um registro com esses dados.");
+      } else {
+        toast.error(
+          `Erro ao salvar tecnologia: ${err.message || JSON.stringify(err)}`
+        );
+      }
     }
   };
 

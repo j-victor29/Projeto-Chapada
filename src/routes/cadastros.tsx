@@ -168,7 +168,11 @@ function CrudShell({
                         setOpen(false);
                         setDraft(blank);
                       } catch (e: any) {
-                        toast.error(e.message ?? "Erro ao salvar o registro");
+                        if (e?.code === '23505' || e?.message?.includes('23505') || e?.message?.includes('duplicate key')) {
+                          toast.error('Já existe um registro com esses dados.');
+                        } else {
+                          toast.error(e.message ?? "Erro ao salvar o registro");
+                        }
                       }
                     }}
                   >

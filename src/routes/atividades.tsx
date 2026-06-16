@@ -81,6 +81,7 @@ import { TipoAcaoSelect } from "@/components/TipoAcaoSelect";
 import { LocalComunidadeSelect } from "@/components/LocalComunidadeSelect";
 import { useFormValidation } from "@/hooks/useFormValidation";
 import { useAuth } from "@/contexts/AuthContext";
+import { trimText, toTitleCase } from "@/utils/sanitize";
 
 export const Route = createFileRoute("/atividades")({
   component: () => (
@@ -212,6 +213,15 @@ function AtividadesPage() {
           if (dataAtividade > umAnoFuturo) {
             errors.data = "A data não pode ser superior a 1 ano no futuro";
           }
+        }
+        const pts = Number(values.participantes) || 0;
+        const mul = Number(values.mulheres) || 0;
+        const jov = Number(values.jovens) || 0;
+        if (mul > pts) {
+          errors.mulheres = "Número de mulheres não pode ser maior que o total de participantes";
+        }
+        if (jov > pts) {
+          errors.jovens = "Número de jovens não pode ser maior que o total de participantes";
         }
       }
     ]
@@ -521,8 +531,12 @@ function AtividadesPage() {
       setEditingId(null);
       setOpen(false);
       queryClient.invalidateQueries({ queryKey: ["atividades-paginated"] });
-    } catch {
-      toast.error("Erro ao salvar atividade. Tente novamente.");
+    } catch (err: any) {
+      if (err?.code === "23505" || err?.message?.includes("23505") || err?.message?.includes("duplicate key")) {
+        toast.error("Já existe um registro com esses dados.");
+      } else {
+        toast.error("Erro ao salvar atividade. Tente novamente.");
+      }
     } finally {
       setSaving(false);
     }
@@ -899,14 +913,17 @@ function AtividadesPage() {
                     ] as const
                   ).map(([key, label]) => (
                     <div key={key}>
-                      <Label className="text-xs">{label}</Label>
+                      <Label className={`text-xs ${formErrors[key] ? "text-red-500" : ""}`}>{label}</Label>
                       <CurrencyInput
                         step={1}
                         value={form[key] !== "" ? Number(form[key]) : undefined}
-                        onChange={(v) =>
-                          setF(key)(v !== undefined ? String(v) : "")
-                        }
+                        onChange={(v) => {
+                          setF(key)(v !== undefined ? String(v) : "");
+                          if (formErrors[key]) setFormErrors(prev => ({ ...prev, [key]: "" }));
+                        }}
+                        className={formErrors[key] ? "border-red-500" : ""}
                       />
+                      {formErrors[key] && <p className="text-[10px] text-red-500 mt-1">{formErrors[key]}</p>}
                     </div>
                   ))}
                 </div>
