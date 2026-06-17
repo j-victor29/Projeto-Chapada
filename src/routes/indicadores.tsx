@@ -22,24 +22,17 @@ import {
   ChevronUp,
   Calendar,
   MapPin,
-  TrendingUp,
   SearchX,
 } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
-  ResponsiveContainer,
-  BarChart,
   Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  Tooltip,
-  CartesianGrid,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-  LineChart,
-  Line,
 } from "recharts";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -49,8 +42,9 @@ import {
   useAtividades,
   useAtividadesIndependentes,
   refreshAtividades,
+  type AtividadeFull,
 } from "@/lib/atividadesStore";
-import { useProjetos } from "@/lib/projetosStore";
+import { useProjetos, type ProjetoDB } from "@/lib/projetosStore";
 import { useTecnologias, CATEGORIAS } from "@/lib/tecnologiasStore";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatDate, formatBRL } from "@/lib/mockData";
@@ -58,20 +52,12 @@ import chapadaLogo from "@/assets/chapada-logo.png";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useExportWord } from "@/hooks/useExportWord";
 import type { DadosIndicadores } from "@/lib/exportWord";
+import { GraficosIndicadores } from "@/components/indicadores/GraficosIndicadores";
+import { coresPDF, hexToRgb } from "@/lib/exportColors";
 
 export const Route = createFileRoute("/indicadores")({
   component: IndicadoresPage,
 });
-
-// ── Color palette ──────────────────────────────────────────────────────────────
-const MUNICIPIO_COLORS = [
-  "#C8522A",
-  "#2D5A27",
-  "#F5A623",
-  "#4A7C3F",
-  "#8B4513",
-  "#6B8E23",
-];
 
 const toneClass: Record<string, string> = {
   primary: "bg-primary/10 text-primary",
@@ -104,14 +90,26 @@ async function imageToBase64(src: string): Promise<string> {
   });
 }
 
+async function loadExportLogo(): Promise<string | null> {
+  try {
+    return await imageToBase64("/logo.png");
+  } catch {
+    try {
+      return await imageToBase64(chapadaLogo);
+    } catch {
+      return null;
+    }
+  }
+}
+
 function drawPageHeader(doc: jsPDF, logoB64: string | null, periodoLabel: string) {
   const pageW = doc.internal.pageSize.getWidth();
-  doc.setFillColor(45, 90, 39);
+  doc.setFillColor(...hexToRgb(coresPDF.rodape));
   doc.rect(0, 0, pageW, 30, "F");
   if (logoB64) {
     try { doc.addImage(logoB64, "PNG", 10, 3, 24, 24); } catch (_) {}
   }
-  doc.setTextColor(255, 255, 255);
+  doc.setTextColor(...hexToRgb(coresPDF.textoRodape));
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.text("Centro de Habilitação e Apoio ao Pequeno Agricultor do Araripe", pageW / 2, 11, { align: "center" });
@@ -119,36 +117,62 @@ function drawPageHeader(doc: jsPDF, logoB64: string | null, periodoLabel: string
   doc.setFontSize(9);
   doc.text("Relatório de Indicadores e Beneficiários", pageW / 2, 18, { align: "center" });
   doc.text(`Período: ${periodoLabel}`, pageW / 2, 24, { align: "center" });
-  doc.setTextColor(30, 30, 30);
+  doc.setTextColor(...hexToRgb(coresPDF.texto));
 }
 
 function drawPageFooter(doc: jsPDF) {
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
-  const totalPages = (doc.internal as any).getNumberOfPages();
+  const totalPages = doc.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
-    (doc as any).setPage(i);
-    doc.setFillColor(45, 90, 39);
+    doc.setPage(i);
+    doc.setFillColor(...hexToRgb(coresPDF.rodape));
     doc.rect(0, pageH - 14, pageW, 14, "F");
-    doc.setTextColor(255, 255, 255);
+    doc.setTextColor(...hexToRgb(coresPDF.textoRodape));
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.text("CHAPADA — chapada@ongchapada.org.br", 14, pageH - 5);
     doc.text(`Página ${i} de ${totalPages}`, pageW - 14, pageH - 5, { align: "right" });
-    doc.setTextColor(30, 30, 30);
+    doc.setTextColor(...hexToRgb(coresPDF.texto));
   }
 }
 
+type JsPdfWithAutoTable = jsPDF & { lastAutoTable?: { finalY: number } };
+
+const lastAutoTableY = (doc: jsPDF) => (doc as JsPdfWithAutoTable).lastAutoTable?.finalY ?? 0;
+
 function sectionTitle(doc: jsPDF, title: string, y: number): number {
   const pageW = doc.internal.pageSize.getWidth();
-  doc.setFillColor(45, 90, 39);
+  doc.setFillColor(...hexToRgb(coresPDF.tabelaCabecalho));
   doc.rect(14, y, pageW - 28, 8, "F");
-  doc.setTextColor(255, 255, 255);
+  doc.setTextColor(...hexToRgb(coresPDF.textoRodape));
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.text(title, 18, y + 5.5);
-  doc.setTextColor(30, 30, 30);
+  doc.setTextColor(...hexToRgb(coresPDF.texto));
   return y + 12;
+}
+
+function drawPdfCover(doc: jsPDF, logoB64: string | null, periodoLabel: string) {
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  if (logoB64) {
+    try {
+      doc.addImage(logoB64, "PNG", pageW / 2 - 45, 92, 90, 90);
+    } catch (_) {}
+  }
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(22);
+  doc.setTextColor(...hexToRgb(coresPDF.titulo));
+  doc.text("CHAPADA", pageW / 2, 214, { align: "center" });
+  doc.setFontSize(14);
+  doc.text("Relatório de Indicadores e Beneficiários", pageW / 2, 244, { align: "center" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.setTextColor(...hexToRgb(coresPDF.textoSecundario));
+  doc.text("Centro de Habilitação e Apoio ao Pequeno Agricultor do Araripe", pageW / 2, 270, { align: "center" });
+  doc.text(`Período: ${periodoLabel}`, pageW / 2, 302, { align: "center" });
+  doc.text(`Gerado em: ${new Date().toLocaleDateString("pt-BR")}`, pageW / 2, pageH - 90, { align: "center" });
 }
 
 // ── Status badge classes (equal to /projetos) ──────────────────────────────────
@@ -197,8 +221,8 @@ function KpiCard({ label, value, sub, icon: Icon, tone }: KpiCardProps) {
 
 // ── Expandable Project Row ─────────────────────────────────────────────────────
 interface ProjectRowProps {
-  projeto: any;
-  atividades: any[];
+  projeto: ProjetoDB;
+  atividades: AtividadeFull[];
   isExpanded: boolean;
   onToggle: () => void;
 }
@@ -313,7 +337,6 @@ function IndicadoresPage() {
   const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
-  const [metricaMunicipio, setMetricaMunicipio] = useState<"atividades" | "participantes" | "tecnologias">("participantes");
 
   useEffect(() => {
     if (!user) return;
@@ -442,41 +465,41 @@ function IndicadoresPage() {
       .map(([, v]) => v);
   }, [filteredVinculadas, filteredIndependentes]);
 
-  // ── Geographic Distribution ───────────────────────────────────────────────────
-  const porMunicipio = useMemo(() => {
+  const atividadesPorMesGrafico = useMemo(
+    () =>
+      timelineData.map((item) => ({
+        mes: item.label,
+        atividades: item.atividades,
+        acoesIndependentes: item.acoes,
+      })),
+    [timelineData]
+  );
+
+  const municipiosPorAtividadeGrafico = useMemo(() => {
     const map: Record<string, number> = {};
+    [...filteredVinculadas, ...filteredIndependentes].forEach((atividade) => {
+      const municipio = atividade.municipio?.trim() || "Não informado";
+      map[municipio] = (map[municipio] ?? 0) + 1;
+    });
+    return Object.entries(map).map(([municipio, atividades]) => ({
+      municipio,
+      atividades,
+    }));
+  }, [filteredVinculadas, filteredIndependentes]);
 
-    if (metricaMunicipio === "tecnologias") {
-      filteredTecnologias.forEach((t) => {
-        const mun = t.municipios?.trim() || "Não informado";
-        const qtd = Number(t.quantidade) || 0;
-        map[mun] = (map[mun] ?? 0) + qtd;
+  const participantesAcumuladosGrafico = useMemo(() => {
+    let acumulado = 0;
+    return [...filteredVinculadas, ...filteredIndependentes]
+      .filter((atividade) => atividade.data)
+      .sort((a, b) => a.data.localeCompare(b.data))
+      .map((atividade) => {
+        acumulado += atividade.indicadores?.participantes ?? 0;
+        return {
+          periodo: formatDate(atividade.data),
+          participantes: acumulado,
+        };
       });
-    } else {
-      const allAtividades = [...filteredVinculadas, ...filteredIndependentes];
-      allAtividades.forEach((a) => {
-        const mun = a.municipio?.trim() || "Não informado";
-        if (metricaMunicipio === "participantes") {
-          const participantes = a.indicadores?.participantes ?? 0;
-          map[mun] = (map[mun] ?? 0) + participantes;
-        } else {
-          // atividades
-          map[mun] = (map[mun] ?? 0) + 1;
-        }
-      });
-    }
-
-    const entries = Object.entries(map)
-      .filter(([, v]) => v > 0)
-      .sort(([, a], [, b]) => b - a);
-
-    if (entries.length <= 5) return entries.map(([name, value]) => ({ name, value }));
-    const top4 = entries.slice(0, 4);
-    const outros = entries.slice(4).reduce((acc, [, v]) => acc + v, 0);
-    return [...top4.map(([name, value]) => ({ name, value })), { name: "Outros", value: outros }];
-  }, [filteredVinculadas, filteredIndependentes, filteredTecnologias, metricaMunicipio]);
-
-  const totalMunicipioValue = porMunicipio.reduce((acc, m) => acc + m.value, 0);
+  }, [filteredVinculadas, filteredIndependentes]);
 
   // ── Beneficiarios Bar Chart ───────────────────────────────────────────────────
   const beneficiarios = [
@@ -658,16 +681,17 @@ function IndicadoresPage() {
       const dateStr = new Date().toLocaleDateString("pt-BR");
       const dateIso = new Date().toISOString().slice(0, 10);
 
-      let logoB64: string | null = null;
-      try { logoB64 = await imageToBase64(chapadaLogo); } catch (_) {}
+      const logoB64 = await loadExportLogo();
 
+      drawPdfCover(doc, logoB64, periodoLabel);
+      doc.addPage();
       drawPageHeader(doc, logoB64, periodoLabel);
       let y = CONTENT_TOP + 6;
       doc.setFont("helvetica", "italic");
       doc.setFontSize(8);
-      doc.setTextColor(100, 100, 100);
+      doc.setTextColor(...hexToRgb(coresPDF.textoSecundario));
       doc.text(`Gerado em: ${dateStr}`, pageW - MARGIN, y, { align: "right" });
-      doc.setTextColor(30, 30, 30);
+      doc.setTextColor(...hexToRgb(coresPDF.texto));
       y += 12;
 
       y = sectionTitle(doc, "SEÇÃO 1 — Resumo Executivo", y);
@@ -689,12 +713,14 @@ function IndicadoresPage() {
           ["Tecnologias Sociais", (totalTecnologiasCount + ind.tecnologiasSociais).toLocaleString("pt-BR")],
         ],
         theme: "striped",
-        headStyles: { fillColor: [45, 90, 39], textColor: 255, fontStyle: "bold" },
+        headStyles: { fillColor: hexToRgb(coresPDF.tabelaCabecalho), textColor: hexToRgb(coresPDF.textoRodape), fontStyle: "bold" },
+        alternateRowStyles: { fillColor: hexToRgb(coresPDF.tabelaLinhaPar) },
+        bodyStyles: { textColor: hexToRgb(coresPDF.texto) },
         columnStyles: { 0: { cellWidth: 300 }, 1: { cellWidth: 100, halign: "center", fontStyle: "bold" } },
         margin: { left: MARGIN, right: MARGIN },
         didDrawPage: () => { drawPageHeader(doc, logoB64, periodoLabel); },
       });
-      y = (doc as any).lastAutoTable.finalY + 18;
+      y = lastAutoTableY(doc) + 18;
 
       if (y > pageH - FOOTER_H - 80) { doc.addPage(); y = CONTENT_TOP + 4; }
       y = sectionTitle(doc, "SEÇÃO 2 — Distribuição por Município", y);
@@ -714,24 +740,26 @@ function IndicadoresPage() {
         head: [["Município", "Participantes", "Projetos", "Atividades"]],
         body: munRows.length > 0 ? munRows : [["Nenhum dado disponível", "-", "-", "-"]],
         theme: "striped",
-        headStyles: { fillColor: [45, 90, 39], textColor: 255, fontStyle: "bold" },
+        headStyles: { fillColor: hexToRgb(coresPDF.tabelaCabecalho), textColor: hexToRgb(coresPDF.textoRodape), fontStyle: "bold" },
+        alternateRowStyles: { fillColor: hexToRgb(coresPDF.tabelaLinhaPar) },
+        bodyStyles: { textColor: hexToRgb(coresPDF.texto) },
         columnStyles: { 1: { halign: "center" }, 2: { halign: "center" }, 3: { halign: "center" } },
         margin: { left: MARGIN, right: MARGIN },
         didDrawPage: () => { drawPageHeader(doc, logoB64, periodoLabel); },
       });
-      y = (doc as any).lastAutoTable.finalY + 18;
+      y = lastAutoTableY(doc) + 18;
 
       if (y > pageH - FOOTER_H - 60) { doc.addPage(); y = CONTENT_TOP + 4; }
       y = sectionTitle(doc, "SEÇÃO 3 — Detalhamento por Projeto", y);
       for (const p of projetosFiltrados) {
         if (y > pageH - FOOTER_H - 100) { doc.addPage(); y = CONTENT_TOP + 4; }
-        doc.setFillColor(230, 240, 229);
+        doc.setFillColor(...hexToRgb(coresPDF.tabelaLinhaPar));
         doc.rect(MARGIN, y, pageW - MARGIN * 2, 10, "F");
         doc.setFont("helvetica", "bold");
         doc.setFontSize(9);
-        doc.setTextColor(45, 90, 39);
+        doc.setTextColor(...hexToRgb(coresPDF.titulo));
         doc.text(`${p.nome}  (${p.contrato})`, MARGIN + 4, y + 7);
-        doc.setTextColor(30, 30, 30);
+        doc.setTextColor(...hexToRgb(coresPDF.texto));
         y += 14;
         const projAtividades = filteredVinculadas.filter((a) => a.projetoId === p.id);
         const projPart = projAtividades.reduce((acc, a) => acc + (a.indicadores?.participantes ?? 0), 0);
@@ -749,7 +777,7 @@ function IndicadoresPage() {
           margin: { left: MARGIN + 4, right: MARGIN },
           didDrawPage: () => { drawPageHeader(doc, logoB64, periodoLabel); },
         });
-        y = (doc as any).lastAutoTable.finalY + 6;
+        y = lastAutoTableY(doc) + 6;
       }
 
       if (y > pageH - FOOTER_H - 60) { doc.addPage(); y = CONTENT_TOP + 4; }
@@ -763,7 +791,9 @@ function IndicadoresPage() {
         head: [["Categoria (Linha de Ação)", "Tecnologia", "Qtd.", "Projeto", "Município"]],
         body: tecRows.length > 0 ? tecRows : [["Nenhuma tecnologia registrada", "", "", "", ""]],
         theme: "striped",
-        headStyles: { fillColor: [45, 90, 39], textColor: 255, fontStyle: "bold" },
+        headStyles: { fillColor: hexToRgb(coresPDF.tabelaCabecalho), textColor: hexToRgb(coresPDF.textoRodape), fontStyle: "bold" },
+        alternateRowStyles: { fillColor: hexToRgb(coresPDF.tabelaLinhaPar) },
+        bodyStyles: { textColor: hexToRgb(coresPDF.texto) },
         styles: { fontSize: 7.5 },
         margin: { left: MARGIN, right: MARGIN },
         didDrawPage: () => { drawPageHeader(doc, logoB64, periodoLabel); },
@@ -787,15 +817,20 @@ function IndicadoresPage() {
       const projetosAtivos = projetos.filter((p) => p.status === "Em execução").length;
 
       const applyHeaderStyle = (ws: XLSX.WorkSheet, headerRow: number, numCols: number) => {
-        const headerStyle = { font: { bold: true, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "2D5A27" } }, alignment: { horizontal: "center" } };
+        const headerStyle = {
+          font: { bold: true, color: { rgb: coresPDF.textoRodape.replace("#", "") } },
+          fill: { fgColor: { rgb: coresPDF.tabelaCabecalho.replace("#", "") } },
+          alignment: { horizontal: "center" },
+        };
         for (let c = 0; c < numCols; c++) {
           const cellAddr = XLSX.utils.encode_cell({ r: headerRow, c });
           if (ws[cellAddr]) ws[cellAddr].s = headerStyle;
         }
       };
 
-      const resumoData: any[][] = [
-        ["CHAPADA — Centro de Habilitação e Apoio ao Pequeno Agricultor do Araripe"],
+      const resumoData: Array<Array<string | number>> = [
+        ["CHAPADA"],
+        ["Centro de Habilitação e Apoio ao Pequeno Agricultor do Araripe"],
         ["Relatório de Indicadores e Beneficiários"],
         [`Período: ${periodoLabel}`],
         [`Data de Geração: ${dateStr}`],
@@ -815,8 +850,9 @@ function IndicadoresPage() {
       ];
       const ws1 = XLSX.utils.aoa_to_sheet(resumoData);
       ws1["!cols"] = [{ wch: 40 }, { wch: 15 }];
-      if (ws1["A1"]) ws1["A1"].s = { font: { bold: true, sz: 14, color: { rgb: "2D5A27" } } };
-      applyHeaderStyle(ws1, 5, 2);
+      if (ws1["A1"]) ws1["A1"].s = { font: { bold: true, sz: 18, color: { rgb: coresPDF.titulo.replace("#", "") } } };
+      if (ws1["A2"]) ws1["A2"].s = { font: { bold: true, sz: 12, color: { rgb: coresPDF.subtitulo.replace("#", "") } } };
+      applyHeaderStyle(ws1, 6, 2);
       XLSX.utils.book_append_sheet(wb, ws1, "Resumo");
 
       const projHeader = ["Projeto", "Contrato", "Financiador", "Início", "Término", "Valor (R$)", "Municípios", "Total Beneficiários", "Status"];
@@ -936,190 +972,12 @@ function IndicadoresPage() {
           </div>
         </div>
 
-        {/* ══════════════════════════════════════════════════════════════════════
-            BLOCO 2 — Evolução temporal (gráfico de linha)
-        ══════════════════════════════════════════════════════════════════════ */}
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Atividades e Ações ao Longo do Tempo
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="h-72">
-            {timelineData.length < 2 ? (
-              <div className="h-full flex flex-col items-center justify-center gap-2 text-muted-foreground">
-                <TrendingUp className="h-10 w-10 opacity-20" />
-                <p className="text-sm font-medium">Dados insuficientes para análise temporal</p>
-                <p className="text-xs opacity-70">Registre atividades em diferentes meses para visualizar a evolução.</p>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={timelineData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.92 0.01 75)" />
-                  <XAxis dataKey="label" stroke="oklch(0.55 0.03 60)" fontSize={11} />
-                  <YAxis stroke="oklch(0.55 0.03 60)" fontSize={11} allowDecimals={false} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", fontSize: "12px" }}
-                    labelStyle={{ fontWeight: "bold", color: "#2D5A27" }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: "12px" }} />
-                  <Line
-                    type="monotone"
-                    dataKey="atividades"
-                    name="Atividades"
-                    stroke="#2D5A27"
-                    strokeWidth={2.5}
-                    dot={{ fill: "#2D5A27", r: 4 }}
-                    activeDot={{ r: 6 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="acoes"
-                    name="Ações Independentes"
-                    stroke="#C8522A"
-                    strokeWidth={2.5}
-                    dot={{ fill: "#C8522A", r: 4 }}
-                    activeDot={{ r: 6 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* ══════════════════════════════════════════════════════════════════════
-            BLOCO 3 — Beneficiários Bar + Municípios Pie
-        ══════════════════════════════════════════════════════════════════════ */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Bar chart */}
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-base font-bold text-foreground">Beneficiários por Grupo</CardTitle>
-            </CardHeader>
-            <CardContent className="h-72">
-              {beneficiarios.every((b) => b.total === 0) ? (
-                <div className="h-full flex items-center justify-center text-sm text-muted-foreground text-center">
-                  Nenhum indicador registrado ainda. Preencha os indicadores nas atividades.
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={beneficiarios}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.92 0.01 75)" />
-                    <XAxis dataKey="grupo" stroke="oklch(0.5 0.03 60)" fontSize={10} />
-                    <YAxis stroke="oklch(0.5 0.03 60)" fontSize={11} allowDecimals={false} />
-                    <Tooltip contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }} />
-                    <Bar dataKey="total" name="Total" fill="#C8522A" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Pie chart + table */}
-          <Card className="shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-base font-bold text-foreground">Distribuição por Município</CardTitle>
-              <div className="flex bg-muted p-1 rounded-md">
-                <button 
-                  onClick={() => setMetricaMunicipio("participantes")}
-                  className={`px-2 py-1 text-[10px] font-medium rounded-sm transition-colors ${metricaMunicipio === "participantes" ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-                >
-                  Participantes
-                </button>
-                <button 
-                  onClick={() => setMetricaMunicipio("atividades")}
-                  className={`px-2 py-1 text-[10px] font-medium rounded-sm transition-colors ${metricaMunicipio === "atividades" ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-                >
-                  Atividades
-                </button>
-                <button 
-                  onClick={() => setMetricaMunicipio("tecnologias")}
-                  className={`px-2 py-1 text-[10px] font-medium rounded-sm transition-colors ${metricaMunicipio === "tecnologias" ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-                >
-                  Tecnologias
-                </button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {porMunicipio.length === 0 ? (
-                <div className="h-72 flex items-center justify-center text-sm text-muted-foreground text-center">
-                  Nenhum dado registrado para a métrica selecionada.
-                </div>
-              ) : (
-                <>
-                  <div className="h-64 mt-2">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                        <Pie 
-                           data={porMunicipio} 
-                           dataKey="value" 
-                           nameKey="name" 
-                           cx="50%" 
-                           cy="50%" 
-                           innerRadius={40}
-                           outerRadius={90} 
-                           label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
-                             if (percent <= 0.05) return null;
-                             const RADIAN = Math.PI / 180;
-                             const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-                             const x = cx + radius * Math.cos(-midAngle * RADIAN);
-                             const y = cy + radius * Math.sin(-midAngle * RADIAN);
-                             return (
-                               <text 
-                                 x={x} 
-                                 y={y} 
-                                 fill="#FFFFFF"
-                                 textAnchor="middle" 
-                                 dominantBaseline="central" 
-                                 fontSize={12} 
-                                 fontWeight="bold"
-                               >
-                                 {`${(percent * 100).toFixed(0)}%`}
-                               </text>
-                             );
-                           }}
-                           labelLine={false}
-                           stroke="none"
-                        >
-                          {porMunicipio.map((_, i) => <Cell key={i} fill={MUNICIPIO_COLORS[i % MUNICIPIO_COLORS.length]} />)}
-                        </Pie>
-                        <Tooltip contentStyle={{ fontSize: "12px", borderRadius: "8px" }} />
-                        <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: "12px", paddingTop: "15px" }} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                  {/* Mini table */}
-                  <div className="mt-4 border border-border/50 rounded-lg overflow-hidden">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="bg-muted/50">
-                          <th className="text-left px-3 py-2 font-semibold text-muted-foreground">Município</th>
-                          <th className="text-center px-3 py-2 font-semibold text-muted-foreground">Total</th>
-                          <th className="text-center px-3 py-2 font-semibold text-muted-foreground">%</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {porMunicipio.map((m, i) => (
-                          <tr key={m.name} className={i % 2 === 0 ? "bg-background" : "bg-muted/20"}>
-                            <td className="px-3 py-1.5 flex items-center gap-1.5">
-                              <span className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: MUNICIPIO_COLORS[i % MUNICIPIO_COLORS.length] }} />
-                              {m.name}
-                            </td>
-                            <td className="px-3 py-1.5 text-center font-semibold">{m.value.toLocaleString("pt-BR")}</td>
-                            <td className="px-3 py-1.5 text-center text-muted-foreground">
-                              {totalMunicipioValue > 0 ? ((m.value / totalMunicipioValue) * 100).toFixed(1) + "%" : "—"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        <GraficosIndicadores
+          beneficiarios={beneficiarios}
+          atividadesPorMes={atividadesPorMesGrafico}
+          municipiosPorAtividade={municipiosPorAtividadeGrafico}
+          participantesAcumulados={participantesAcumuladosGrafico}
+        />
 
         {/* ══════════════════════════════════════════════════════════════════════
             BLOCO 4 — Desempenho por Projeto (tabela expandível)
@@ -1181,28 +1039,28 @@ function IndicadoresPage() {
                 <div style={{ height: `${Math.max(200, tecPorLinha.length * 48 + 40)}px` }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={tecPorLinha} layout="vertical" margin={{ top: 4, right: 30, left: 8, bottom: 4 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.92 0.01 75)" horizontal={false} />
-                      <XAxis type="number" stroke="oklch(0.55 0.03 60)" fontSize={11} allowDecimals={false} />
-                      <YAxis type="category" dataKey="name" stroke="oklch(0.55 0.03 60)" fontSize={10} width={200} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={coresPDF.borda} horizontal={false} />
+                      <XAxis type="number" stroke={coresPDF.textoSecundario} fontSize={11} allowDecimals={false} />
+                      <YAxis type="category" dataKey="name" stroke={coresPDF.textoSecundario} fontSize={10} width={200} />
                       <Tooltip
                         contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", fontSize: "12px" }}
                         formatter={(val, _name, props) => [val, props.payload?.fullName || props.payload?.name]}
                       />
-                      <Bar dataKey="value" name="Unidades implementadas" fill="#4A7C3F" radius={[0, 6, 6, 0]} />
+                      <Bar dataKey="value" name="Unidades implementadas" fill={coresPDF.chart2} radius={[0, 6, 6, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-6 justify-center border-t border-border/50 pt-4">
                   <div className="text-center">
-                    <div className="text-2xl font-bold" style={{ color: "#2D5A27" }}>{filteredTecnologias.length}</div>
+                    <div className="text-2xl font-bold" style={{ color: coresPDF.titulo }}>{filteredTecnologias.length}</div>
                     <div className="text-xs text-muted-foreground">Tecnologias registradas</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold" style={{ color: "#4A7C3F" }}>{totalTecnologiasCount.toLocaleString("pt-BR")}</div>
+                    <div className="text-2xl font-bold" style={{ color: coresPDF.chart2 }}>{totalTecnologiasCount.toLocaleString("pt-BR")}</div>
                     <div className="text-xs text-muted-foreground">Total de unidades implementadas</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold" style={{ color: "#C8522A" }}>{tecPorLinha.length}</div>
+                    <div className="text-2xl font-bold" style={{ color: coresPDF.chart3 }}>{tecPorLinha.length}</div>
                     <div className="text-xs text-muted-foreground">Linhas de ação ativas</div>
                   </div>
                 </div>

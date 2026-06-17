@@ -5,6 +5,7 @@ import {
   Footer,
   Header,
   HeadingLevel,
+  ImageRun,
   PageBreak,
   PageNumber,
   Paragraph,
@@ -18,6 +19,7 @@ import {
   TextRun,
   WidthType,
 } from "docx";
+import { coresPDF, hexWithoutHash } from "@/lib/exportColors";
 
 export interface FiltrosIndicadores {
   dataDe?: string;
@@ -92,13 +94,13 @@ const PAGE_HEIGHT_DXA = 16838;
 const MARGIN_DXA = 1134;
 const CONTENT_WIDTH_DXA = 9638;
 const FONT = "Arial";
-const BLUE = "1E3A5C";
-const HEADING_BLUE = "1E40AF";
+const BLUE = hexWithoutHash(coresPDF.titulo);
+const HEADING_BLUE = hexWithoutHash(coresPDF.subtitulo);
 const WHITE = "FFFFFF";
-const ROW_EVEN = "EFF6FF";
-const ROW_ODD = "FFFFFF";
-const TOTAL = "FFF3E0";
-const BORDER = "D9E2EC";
+const ROW_EVEN = hexWithoutHash(coresPDF.tabelaLinhaPar);
+const ROW_ODD = hexWithoutHash(coresPDF.tabelaLinhaImpar);
+const TOTAL = hexWithoutHash(coresPDF.totalDestaque);
+const BORDER = hexWithoutHash(coresPDF.borda);
 const CELL_MARGINS = { top: 80, bottom: 80, left: 120, right: 120 };
 
 const column = (parts: number[]) =>
@@ -229,8 +231,24 @@ const tabela = (headers: string[], rows: Array<Array<string | number>>, widths: 
 
 const emptyRow = (cols: number) => [Array.from({ length: cols }, (_, index) => (index === 0 ? "Nenhum dado disponível" : "-"))];
 
-const capa = (dados: DadosIndicadores) => [
+const logoParagraph = (logoData?: ArrayBuffer) =>
+  logoData
+    ? new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 220 },
+        children: [
+          new ImageRun({
+            data: logoData,
+            transformation: { width: 120, height: 120 },
+            type: "png",
+          }),
+        ],
+      })
+    : paragraph("CHAPADA", { size: 42, bold: true, color: BLUE, alignment: AlignmentType.CENTER });
+
+const capa = (dados: DadosIndicadores, logoData?: ArrayBuffer) => [
   new Paragraph({ spacing: { before: 1800 } }),
+  logoParagraph(logoData),
   paragraph("CHAPADA", { size: 42, bold: true, color: BLUE, alignment: AlignmentType.CENTER }),
   paragraph("Centro de Habilitação e Apoio ao Pequeno Agricultor do Araripe", {
     size: 24,
@@ -407,7 +425,7 @@ const resumoConsolidado = (dados: DadosIndicadores) => {
   ];
 };
 
-export function gerarDocumentoWord(dados: DadosIndicadores): Document {
+export function gerarDocumentoWord(dados: DadosIndicadores, logoData?: ArrayBuffer): Document {
   return new Document({
     styles: {
       default: {
@@ -430,7 +448,7 @@ export function gerarDocumentoWord(dados: DadosIndicadores): Document {
             },
           },
         },
-        children: capa(dados),
+        children: capa(dados, logoData),
       },
       {
         headers: { default: header(dados.filtros.periodoLabel) },

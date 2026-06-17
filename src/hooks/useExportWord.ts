@@ -5,6 +5,7 @@ import {
   gerarDocumentoWord,
   type DadosIndicadores,
 } from "@/lib/exportWord";
+import chapadaLogo from "@/assets/chapada-logo.png";
 
 const downloadBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
@@ -22,6 +23,15 @@ const filenameHoje = () => {
   return `relatorio-chapada-${dateIso}.docx`;
 };
 
+const buscarLogo = async () => {
+  const publicLogo = await fetch("/logo.png");
+  if (publicLogo.ok) return publicLogo.arrayBuffer();
+
+  const bundledLogo = await fetch(chapadaLogo);
+  if (!bundledLogo.ok) return undefined;
+  return bundledLogo.arrayBuffer();
+};
+
 export async function buscarDadosIndicadores(dados: DadosIndicadores): Promise<DadosIndicadores> {
   return dados;
 }
@@ -35,7 +45,8 @@ export function useExportWord(dados: DadosIndicadores) {
 
     try {
       const dadosIndicadores = await buscarDadosIndicadores(dados);
-      const document = gerarDocumentoWord(dadosIndicadores);
+      const logoData = await buscarLogo().catch(() => undefined);
+      const document = gerarDocumentoWord(dadosIndicadores, logoData);
       const blob = await Packer.toBlob(document);
 
       downloadBlob(blob, filenameHoje());
