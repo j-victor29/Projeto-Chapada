@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import {
   FileDown,
   FileSpreadsheet,
+  FileText,
   X,
   RefreshCw,
   Users,
@@ -55,6 +56,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { formatDate, formatBRL } from "@/lib/mockData";
 import chapadaLogo from "@/assets/chapada-logo.png";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { useExportWord } from "@/hooks/useExportWord";
+import type { DadosIndicadores } from "@/lib/exportWord";
 
 export const Route = createFileRoute("/indicadores")({
   component: IndicadoresPage,
@@ -522,6 +525,127 @@ function IndicadoresPage() {
     return "Todos os períodos";
   }, [dataDe, dataAte]);
 
+  const dadosWord = useMemo<DadosIndicadores>(() => {
+    const municipioMap = new Map<
+      string,
+      {
+        participantes: number;
+        projetos: Set<string>;
+        atividades: number;
+        tecnologias: number;
+      }
+    >();
+
+    [...filteredVinculadas, ...filteredIndependentes].forEach((atividade) => {
+      const municipio = atividade.municipio?.trim() || "Não informado";
+      const atual =
+        municipioMap.get(municipio) ??
+        { participantes: 0, projetos: new Set<string>(), atividades: 0, tecnologias: 0 };
+
+      atual.participantes += atividade.indicadores?.participantes ?? 0;
+      atual.atividades += 1;
+      if (atividade.projetoId) atual.projetos.add(atividade.projetoId);
+      municipioMap.set(municipio, atual);
+    });
+
+    filteredTecnologias.forEach((tecnologia) => {
+      const municipio = tecnologia.municipios?.trim() || "Não informado";
+      const atual =
+        municipioMap.get(municipio) ??
+        { participantes: 0, projetos: new Set<string>(), atividades: 0, tecnologias: 0 };
+
+      atual.tecnologias += Number(tecnologia.quantidade) || 0;
+      if (tecnologia.projetoId) atual.projetos.add(tecnologia.projetoId);
+      municipioMap.set(municipio, atual);
+    });
+
+    const projetosWord = projetosFiltrados.map((projeto) => {
+      const atividadesProjeto = filteredVinculadas.filter((atividade) => atividade.projetoId === projeto.id);
+      return {
+        id: projeto.id,
+        nome: projeto.nome,
+        contrato: projeto.contrato,
+        financiador: projeto.financiador,
+        inicio: projeto.inicio,
+        termino: projeto.termino,
+        valor: projeto.valor,
+        municipios: projeto.municipios,
+        status: projeto.status,
+        atividades: atividadesProjeto.length,
+        participantes: atividadesProjeto.reduce(
+          (acc, atividade) => acc + (atividade.indicadores?.participantes ?? 0),
+          0
+        ),
+        mulheres: atividadesProjeto.reduce(
+          (acc, atividade) => acc + (atividade.indicadores?.mulheres ?? 0),
+          0
+        ),
+      };
+    });
+
+    return {
+      filtros: { dataDe, dataAte, periodoLabel },
+      geradoEm: new Date(),
+      kpis: [
+        { indicador: "Total de Participantes", total: ind.participantes },
+        { indicador: "Mulheres Beneficiadas", total: ind.mulheres },
+        { indicador: "Jovens Atendidos", total: ind.jovens },
+        { indicador: "Famílias Atendidas", total: totalFamilias },
+        { indicador: "Público Quilombola", total: ind.quilombolas },
+        { indicador: "Povos Originários", total: ind.povosOriginarios },
+        { indicador: "Comunidades Tradicionais", total: ind.comunidadesTradicionais },
+        { indicador: "Projetos Ativos", total: projetos.filter((p) => p.status === "Em execução").length },
+        { indicador: "Atividades Realizadas", total: filteredVinculadas.length },
+        { indicador: "Ações Independentes", total: filteredIndependentes.length },
+        { indicador: "Tecnologias Sociais", total: totalTecnologiasCount + ind.tecnologiasSociais },
+      ],
+      projetos: projetosWord,
+      municipios: [...municipioMap.entries()]
+        .map(([municipio, valores]) => ({
+          municipio,
+          participantes: valores.participantes,
+          projetos: valores.projetos.size,
+          atividades: valores.atividades,
+          tecnologias: valores.tecnologias,
+        }))
+        .sort((a, b) => b.participantes - a.participantes),
+      gruposBeneficiarios: beneficiarios,
+      atividadesMensais: timelineData.map((item) => ({
+        mes: item.label,
+        atividades: item.atividades,
+        acoesIndependentes: item.acoes,
+      })),
+      tecnologias: filteredTecnologias.map((tecnologia) => {
+        const projeto = projetos.find((p) => p.id === tecnologia.projetoId);
+        return {
+          categoria: CATEGORIAS[tecnologia.categoria]?.label || tecnologia.categoria,
+          nome: tecnologia.nome,
+          quantidade: Number(tecnologia.quantidade) || 0,
+          familias: Number(tecnologia.familias) || 0,
+          projeto: projeto?.nome || "-",
+          municipio: tecnologia.municipios || "-",
+          data: tecnologia.data,
+        };
+      }),
+    };
+  }, [
+    beneficiarios,
+    dataAte,
+    dataDe,
+    filteredIndependentes,
+    filteredTecnologias,
+    filteredVinculadas,
+    ind,
+    periodoLabel,
+    projetos,
+    projetosFiltrados,
+    timelineData,
+    totalFamilias,
+    totalTecnologiasCount,
+  ]);
+
+  const { handleExportWord, isExportingWord } = useExportWord(dadosWord);
+
   // ── Export PDF ────────────────────────────────────────────────────────────────
   const exportPDF = async () => {
     try {
@@ -754,6 +878,10 @@ function IndicadoresPage() {
           </Button>
           <Button variant="outline" className="gap-2 chapada-btn" onClick={exportPDF}>
             <FileDown className="h-4 w-4" /> Exportar PDF
+          </Button>
+          <Button variant="outline" onClick={handleExportWord} disabled={isExportingWord} className="gap-2">
+            <FileText className="h-4 w-4" />
+            {isExportingWord ? "Gerando..." : "Exportar Word"}
           </Button>
           <Button className="gap-2 chapada-btn" onClick={exportExcel}>
             <FileSpreadsheet className="h-4 w-4" /> Exportar Excel

@@ -16,6 +16,11 @@ dist-ssr
 .nitro
 *.local
 
+# Environment variables
+.env
+.env.*
+!.env.example
+
 # Bun binary lockfile (use package-lock.json for CI/CD compatibility)
 bun.lockb
 
