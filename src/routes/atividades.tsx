@@ -51,6 +51,8 @@ import {
   Search,
   Filter,
   Users,
+  ClipboardList,
+  SearchX,
 } from "lucide-react";
 import { formatDate } from "@/lib/mockData";
 import { Municipios } from "@/lib/cadastrosStore";
@@ -79,6 +81,7 @@ import {
 } from "@/lib/autocompleteHooks";
 import { TipoAcaoSelect } from "@/components/TipoAcaoSelect";
 import { LocalComunidadeSelect } from "@/components/LocalComunidadeSelect";
+import { EmptySelectMessage, EmptyState } from "@/components/ui/EmptyState";
 import { useFormValidation } from "@/hooks/useFormValidation";
 import { useAuth } from "@/contexts/AuthContext";
 import { trimText, toTitleCase } from "@/utils/sanitize";
@@ -157,7 +160,7 @@ function AtividadesPage() {
   const ordenadas = useAtividades();
   const { data: dbMunicipios = [] } = Municipios.useList();
   const projetos = useProjetos();
-  const { query } = useGlobalSearch();
+  const { query, setQuery } = useGlobalSearch();
   const queryClient = useQueryClient();
   const { session } = useAuth();
   const user = session?.user;
@@ -177,9 +180,10 @@ function AtividadesPage() {
       dataAte !== "" ||
       selProjeto !== "todos" ||
       selTipo !== "todos" ||
-      selMunicipio !== "todos"
+      selMunicipio !== "todos" ||
+      query.trim() !== ""
     );
-  }, [dataDe, dataAte, selProjeto, selTipo, selMunicipio]);
+  }, [dataDe, dataAte, selProjeto, selTipo, selMunicipio, query]);
 
   const isPeriodInvalid = !!(dataDe && dataAte && dataDe > dataAte);
 
@@ -189,6 +193,7 @@ function AtividadesPage() {
     setSelProjeto("todos");
     setSelTipo("todos");
     setSelMunicipio("todos");
+    setQuery("");
   };
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [loading, setLoading] = useState(false);
@@ -609,11 +614,19 @@ function AtividadesPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="todos">Todos os projetos</SelectItem>
-                      {projetos.map((p) => (
-                        <SelectItem key={p.id} value={p.id} className="text-xs">
-                          {p.nome}
-                        </SelectItem>
-                      ))}
+                      {projetos.length > 0 ? (
+                        projetos.map((p) => (
+                          <SelectItem key={p.id} value={p.id} className="text-xs">
+                            {p.nome}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <EmptySelectMessage
+                          title="Nenhum projeto cadastrado ainda."
+                          description="Acesse Projetos para cadastrar o primeiro."
+                          action={{ label: "Ir para Projetos", href: "/projetos" }}
+                        />
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -626,11 +639,18 @@ function AtividadesPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="todos">Todos os tipos de ação</SelectItem>
-                      {dbTiposAcao.map((t) => (
-                        <SelectItem key={t.id} value={t.nome} className="text-xs">
-                          {t.nome}
-                        </SelectItem>
-                      ))}
+                      {dbTiposAcao.length > 0 ? (
+                        dbTiposAcao.map((t) => (
+                          <SelectItem key={t.id} value={t.nome} className="text-xs">
+                            {t.nome}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <EmptySelectMessage
+                          title="Nenhum tipo de ação cadastrado."
+                          description="Você pode adicionar um novo tipo digitando acima."
+                        />
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -643,11 +663,18 @@ function AtividadesPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="todos">Todos os municípios</SelectItem>
-                      {dbMunicipios.map((m) => (
-                        <SelectItem key={m.id} value={m.nome} className="text-xs">
-                          {m.nome}
-                        </SelectItem>
-                      ))}
+                      {dbMunicipios.length > 0 ? (
+                        dbMunicipios.map((m) => (
+                          <SelectItem key={m.id} value={m.nome} className="text-xs">
+                            {m.nome}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <EmptySelectMessage
+                          title="Não foi possível carregar os municípios."
+                          description="Verifique sua conexão e tente novamente."
+                        />
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -679,11 +706,23 @@ function AtividadesPage() {
               Carregando atividades...
             </p>
           ) : items.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">
-              {query
-                ? "Nenhuma atividade encontrada para esta busca."
-                : "Nenhuma atividade registrada ainda."}
-            </p>
+            ordenadas.length === 0 ? (
+              <EmptyState
+                icon={<ClipboardList />}
+                title="Nenhuma atividade registrada"
+                description="Registre atividades vinculadas aos projetos."
+                action={{ label: "+ Nova Atividade", onClick: openNew }}
+                className="border-0"
+              />
+            ) : (
+              <EmptyState
+                icon={<SearchX />}
+                title="Nenhum resultado encontrado"
+                description="Tente ajustar os filtros ou limpar a busca."
+                action={{ label: "Limpar filtros", onClick: clearFilters }}
+                className="border-0"
+              />
+            )
           ) : (
             <ol className="relative border-l-2 border-border ml-3 space-y-5">
               {items.map((a: AtividadeFull) => {
@@ -743,7 +782,11 @@ function AtividadesPage() {
                       </SelectItem>
                     ))
                   ) : (
-                    <SelectItem value="none" disabled>Nenhum projeto</SelectItem>
+                    <EmptySelectMessage
+                      title="Nenhum projeto cadastrado ainda."
+                      description="Acesse Projetos para cadastrar o primeiro."
+                      action={{ label: "Ir para Projetos", href: "/projetos" }}
+                    />
                   )}
                 </SelectContent>
               </Select>
@@ -852,9 +895,10 @@ function AtividadesPage() {
                           );
                         })
                       ) : municipioInput.trim().length >= 2 && !munLoading ? (
-                        <div className="px-3 py-2 text-xs text-muted-foreground">
-                          Nenhum município encontrado.
-                        </div>
+                        <EmptySelectMessage
+                          title="Não foi possível carregar os municípios."
+                          description="Verifique sua conexão e tente novamente."
+                        />
                       ) : null}
                     </div>
                   )}

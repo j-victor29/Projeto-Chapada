@@ -16,6 +16,8 @@ import {
   Pencil,
   Filter,
   X,
+  ImageOff,
+  SearchX,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -77,6 +79,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PaginationControls } from "@/components/PaginationControls";
 import { useAuth } from "@/contexts/AuthContext";
+import { EmptySelectMessage, EmptyState } from "@/components/ui/EmptyState";
 
 export const Route = createFileRoute("/imagens")({
   component: ImagensPage,
@@ -110,7 +113,7 @@ function ImagensPage() {
   const { data: dbMunicipios = [] } = Municipios.useList();
   const categorias = useCategorias();
   const projetos = useProjetos();
-  const { query } = useGlobalSearch();
+  const { query, setQuery } = useGlobalSearch();
   const { email: currentEmail, name: currentName } = useCurrentUser();
   const [selected, setSelected] = useState<ImagemItem | null>(null);
   const [toDelete, setToDelete] = useState<ImagemItem | null>(null);
@@ -186,9 +189,10 @@ function ImagensPage() {
       selTipo !== "todos" ||
       selMunicipio !== "todos" ||
       filtroAtividade !== "todos" ||
-      filtroAcaoIndependente !== "todos"
+      filtroAcaoIndependente !== "todos" ||
+      query.trim() !== ""
     );
-  }, [dataDe, dataAte, categoriaFiltro, selProjeto, selTipo, selMunicipio, filtroAtividade, filtroAcaoIndependente]);
+  }, [dataDe, dataAte, categoriaFiltro, selProjeto, selTipo, selMunicipio, filtroAtividade, filtroAcaoIndependente, query]);
 
   const isPeriodInvalid = !!(dataDe && dataAte && dataDe > dataAte);
 
@@ -201,6 +205,7 @@ function ImagensPage() {
     setSelMunicipio("todos");
     setFiltroAtividade("todos");
     setFiltroAcaoIndependente("todos");
+    setQuery("");
   };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -494,11 +499,21 @@ function ImagensPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="todos">Todos os projetos</SelectItem>
-                      {projetos?.filter(p => p.id && String(p.id).trim() !== "").map((p) => (
-                        <SelectItem key={p.id} value={String(p.id)} className="text-xs">
-                          {p.nome}
-                        </SelectItem>
-                      ))}
+                      {projetos.length > 0 ? (
+                        projetos
+                          .filter(p => p.id && String(p.id).trim() !== "")
+                          .map((p) => (
+                            <SelectItem key={p.id} value={String(p.id)} className="text-xs">
+                              {p.nome}
+                            </SelectItem>
+                          ))
+                      ) : (
+                        <EmptySelectMessage
+                          title="Nenhum projeto cadastrado ainda."
+                          description="Acesse Projetos para cadastrar o primeiro."
+                          action={{ label: "Ir para Projetos", href: "/projetos" }}
+                        />
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -528,11 +543,18 @@ function ImagensPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="todos">Todos os municípios</SelectItem>
-                      {dbMunicipios.map((m) => (
-                        <SelectItem key={m.id} value={m.nome} className="text-xs">
-                          {m.nome}
-                        </SelectItem>
-                      ))}
+                      {dbMunicipios.length > 0 ? (
+                        dbMunicipios.map((m) => (
+                          <SelectItem key={m.id} value={m.nome} className="text-xs">
+                            {m.nome}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <EmptySelectMessage
+                          title="Não foi possível carregar os municípios."
+                          description="Verifique sua conexão e tente novamente."
+                        />
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -551,11 +573,18 @@ function ImagensPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="todas">Todas as categorias</SelectItem>
-                      {categorias.map((c) => (
-                        <SelectItem key={c.id} value={c.id} className="text-xs">
-                          {c.nome}
-                        </SelectItem>
-                      ))}
+                      {categorias.length > 0 ? (
+                        categorias.map((c) => (
+                          <SelectItem key={c.id} value={c.id} className="text-xs">
+                            {c.nome}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <EmptySelectMessage
+                          title="Nenhuma categoria cadastrada."
+                          action={{ label: "Ir para Cadastros", href: "/cadastros" }}
+                        />
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -620,21 +649,20 @@ function ImagensPage() {
           </h3>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="chapada-empty">
-          <div className="chapada-empty-icon">
-            <FolderOpen className="h-8 w-8" />
-          </div>
-          <h3 className="text-base font-semibold text-foreground mb-1">
-            {query || categoriaFiltro.length > 0 || dataDe || dataAte
-              ? "Nenhuma imagem encontrada para este filtro."
-              : "Galeria vazia"}
-          </h3>
-          {filtered.length === 0 && !query && (
-            <p className="text-sm text-muted-foreground">
-              Clique em "Enviar Imagens" para começar.
-            </p>
-          )}
-        </div>
+        !hasActiveFilters && total === 0 ? (
+          <EmptyState
+            icon={<ImageOff />}
+            title="Nenhuma imagem cadastrada"
+            description="As imagens anexadas em atividades aparecem aqui."
+          />
+        ) : (
+          <EmptyState
+            icon={<SearchX />}
+            title="Nenhum resultado encontrado"
+            description="Tente ajustar os filtros ou limpar a busca."
+            action={{ label: "Limpar filtros", onClick: clearFilters }}
+          />
+        )
       ) : (
         <div className="space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -700,34 +728,49 @@ function ImagensPage() {
                   <SelectValue placeholder="Selecione (opcional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  {projetos?.filter(p => p.id && String(p.id).trim() !== "").map((p) => (
-                    <SelectItem key={p.id} value={String(p.id)}>
-                      {p.nome}
-                    </SelectItem>
-                  ))}
+                  {projetos.length > 0 ? (
+                    projetos
+                      .filter(p => p.id && String(p.id).trim() !== "")
+                      .map((p) => (
+                        <SelectItem key={p.id} value={String(p.id)}>
+                          {p.nome}
+                        </SelectItem>
+                      ))
+                  ) : (
+                    <EmptySelectMessage
+                      title="Nenhum projeto cadastrado ainda."
+                      description="Acesse Projetos para cadastrar o primeiro."
+                      action={{ label: "Ir para Projetos", href: "/projetos" }}
+                    />
+                  )}
                 </SelectContent>
               </Select>
             </div>
-            {categorias.length > 0 && (
-              <div>
-                <Label>Categoria Temática</Label>
-                <Select
-                  value={form.categoriaId}
-                  onValueChange={(v) => setForm((f) => ({ ...f, categoriaId: v }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione (opcional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categorias.map((cat) => (
+            <div>
+              <Label>Categoria Temática</Label>
+              <Select
+                value={form.categoriaId}
+                onValueChange={(v) => setForm((f) => ({ ...f, categoriaId: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione (opcional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categorias.length > 0 ? (
+                    categorias.map((cat) => (
                       <SelectItem key={cat.id} value={cat.id}>
                         {cat.nome}
                       </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+                    ))
+                  ) : (
+                    <EmptySelectMessage
+                      title="Nenhuma categoria cadastrada."
+                      action={{ label: "Ir para Cadastros", href: "/cadastros" }}
+                    />
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
             <div>
               <Label>Município / Local</Label>
               <Select
@@ -738,11 +781,18 @@ function ImagensPage() {
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  {dbMunicipios.map((m) => (
-                    <SelectItem key={m.id} value={m.nome}>
-                      {m.nome}
-                    </SelectItem>
-                  ))}
+                  {dbMunicipios.length > 0 ? (
+                    dbMunicipios.map((m) => (
+                      <SelectItem key={m.id} value={m.nome}>
+                        {m.nome}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <EmptySelectMessage
+                      title="Não foi possível carregar os municípios."
+                      description="Verifique sua conexão e tente novamente."
+                    />
+                  )}
                 </SelectContent>
               </Select>
             </div>

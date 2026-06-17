@@ -21,7 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, MessageSquare, RefreshCw, Send, Pencil } from "lucide-react";
+import { Loader2, MessageSquare, RefreshCw, Send, Pencil, Users, SearchX } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -34,6 +34,7 @@ import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserPresence, type UserStatus } from "@/hooks/useUserPresence";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export const Route = createFileRoute("/usuarios")({
   component: UsuariosPage,
@@ -161,7 +162,7 @@ function PresenceAvatar({
 // ─── Página principal ─────────────────────────────────────────────────────────
 
 function UsuariosPage() {
-  const { query } = useGlobalSearch();
+  const { query, setQuery } = useGlobalSearch();
   const { user } = useAuth();
   const profile = useProfile(user?.email ?? "");
   const senderName = fullName(profile, user?.email?.split("@")[0] ?? "Usuário");
@@ -353,11 +354,23 @@ function UsuariosPage() {
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="text-center text-sm text-muted-foreground py-8"
-                  >
-                    Nenhum usuário encontrado.
+                  <TableCell colSpan={6} className="p-6">
+                    {usuarios.length === 0 ? (
+                      <EmptyState
+                        icon={<Users />}
+                        title="Nenhum usuário encontrado"
+                        description="Convide colaboradores para acessar o sistema."
+                        className="border-0"
+                      />
+                    ) : (
+                      <EmptyState
+                        icon={<SearchX />}
+                        title="Nenhum resultado encontrado"
+                        description="Tente ajustar os filtros ou limpar a busca."
+                        action={{ label: "Limpar filtros", onClick: () => setQuery("") }}
+                        className="border-0"
+                      />
+                    )}
                   </TableCell>
                 </TableRow>
               ) : (

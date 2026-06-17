@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Plus, Check } from "lucide-react";
 import { useTiposAcao, toTitleCase } from "@/lib/autocompleteHooks";
 import { toast } from "sonner";
+import { EmptySelectMessage } from "@/components/ui/EmptyState";
 
 const NOVO_TIPO_SENTINEL = "__novo__";
 
@@ -111,13 +112,20 @@ export function TipoAcaoSelect({ value, onValueChange, disabled, className }: Pr
           <SelectValue placeholder={loading ? "Carregando..." : "Selecione"} />
         </SelectTrigger>
         <SelectContent>
-          {tipos
-            .filter((t) => t.nome && t.nome.trim() !== "")
-            .map((t) => (
-              <SelectItem key={t.id} value={t.nome}>
-                {t.nome}
-              </SelectItem>
-            ))}
+          {tipos.filter((t) => t.nome && t.nome.trim() !== "").length > 0 ? (
+            tipos
+              .filter((t) => t.nome && t.nome.trim() !== "")
+              .map((t) => (
+                <SelectItem key={t.id} value={t.nome}>
+                  {t.nome}
+                </SelectItem>
+              ))
+          ) : (
+            <EmptySelectMessage
+              title="Nenhum tipo de ação cadastrado."
+              description="Você pode adicionar um novo tipo digitando acima."
+            />
+          )}
           <SelectItem
             key={NOVO_TIPO_SENTINEL}
             value={NOVO_TIPO_SENTINEL}

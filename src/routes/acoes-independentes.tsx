@@ -50,6 +50,8 @@ import {
   Search,
   Filter,
   Users,
+  Zap,
+  SearchX,
 } from "lucide-react";
 import { formatDate } from "@/lib/mockData";
 import { Municipios } from "@/lib/cadastrosStore";
@@ -79,6 +81,7 @@ import { TipoAcaoSelect } from "@/components/TipoAcaoSelect";
 import { LocalComunidadeSelect } from "@/components/LocalComunidadeSelect";
 import { useFormValidation } from "@/hooks/useFormValidation";
 import { trimText, toTitleCase } from "@/utils/sanitize";
+import { EmptySelectMessage, EmptyState } from "@/components/ui/EmptyState";
 
 export const Route = createFileRoute("/acoes-independentes")({
   component: AcoesIndependentesPage,
@@ -140,7 +143,7 @@ const toFormState = (a: AtividadeFull): FormState => ({
 function AcoesIndependentesPage() {
   const ordenadas = useAtividadesIndependentes();
   const { data: dbMunicipios = [] } = Municipios.useList();
-  const { query } = useGlobalSearch();
+  const { query, setQuery } = useGlobalSearch();
   const queryClient = useQueryClient();
 
   // ── Estados de Filtro local ──────────────────────────────────────────────
@@ -156,9 +159,10 @@ function AcoesIndependentesPage() {
       dataDe !== "" ||
       dataAte !== "" ||
       selTipo !== "todos" ||
-      selMunicipio !== "todos"
+      selMunicipio !== "todos" ||
+      query.trim() !== ""
     );
-  }, [dataDe, dataAte, selTipo, selMunicipio]);
+  }, [dataDe, dataAte, selTipo, selMunicipio, query]);
 
   const isPeriodInvalid = !!(dataDe && dataAte && dataDe > dataAte);
 
@@ -167,6 +171,7 @@ function AcoesIndependentesPage() {
     setDataAte("");
     setSelTipo("todos");
     setSelMunicipio("todos");
+    setQuery("");
   };
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [loading, setLoading] = useState(false);
@@ -569,11 +574,18 @@ function AcoesIndependentesPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="todos">Todos os tipos de ação</SelectItem>
-                      {dbTiposAcao.map((t) => (
-                        <SelectItem key={t.id} value={t.nome} className="text-xs">
-                          {t.nome}
-                        </SelectItem>
-                      ))}
+                      {dbTiposAcao.length > 0 ? (
+                        dbTiposAcao.map((t) => (
+                          <SelectItem key={t.id} value={t.nome} className="text-xs">
+                            {t.nome}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <EmptySelectMessage
+                          title="Nenhum tipo de ação cadastrado."
+                          description="Você pode adicionar um novo tipo digitando acima."
+                        />
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -586,11 +598,18 @@ function AcoesIndependentesPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="todos">Todos os municípios</SelectItem>
-                      {dbMunicipios.map((m) => (
-                        <SelectItem key={m.id} value={m.nome} className="text-xs">
-                          {m.nome}
-                        </SelectItem>
-                      ))}
+                      {dbMunicipios.length > 0 ? (
+                        dbMunicipios.map((m) => (
+                          <SelectItem key={m.id} value={m.nome} className="text-xs">
+                            {m.nome}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <EmptySelectMessage
+                          title="Não foi possível carregar os municípios."
+                          description="Verifique sua conexão e tente novamente."
+                        />
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -618,13 +637,23 @@ function AcoesIndependentesPage() {
           </div>
 
           {items.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">
-              {query
-                ? "Nenhuma ação independente encontrada para esta busca."
-                : ordenadas.length === 0
-                ? "Carregando ações independentes..."
-                : "Nenhuma ação independente registrada ainda."}
-            </p>
+            ordenadas.length === 0 ? (
+              <EmptyState
+                icon={<Zap />}
+                title="Nenhuma ação independente registrada"
+                description="Registre ações realizadas sem vínculo a projetos."
+                action={{ label: "+ Nova Ação", onClick: openNew }}
+                className="border-0"
+              />
+            ) : (
+              <EmptyState
+                icon={<SearchX />}
+                title="Nenhum resultado encontrado"
+                description="Tente ajustar os filtros ou limpar a busca."
+                action={{ label: "Limpar filtros", onClick: clearFilters }}
+                className="border-0"
+              />
+            )
           ) : (
             <ol className="relative border-l-2 border-border ml-3 space-y-5">
               {items.map((a) => {
@@ -779,9 +808,10 @@ function AcoesIndependentesPage() {
                           );
                         })
                       ) : municipioInput.trim().length >= 2 && !munLoading ? (
-                        <div className="px-3 py-2 text-xs text-muted-foreground">
-                          Nenhum município encontrado.
-                        </div>
+                        <EmptySelectMessage
+                          title="Não foi possível carregar os municípios."
+                          description="Verifique sua conexão e tente novamente."
+                        />
                       ) : null}
                     </div>
                   )}

@@ -24,7 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Upload, Trash2, Download, History, FileText, Search, GitBranch, FolderOpen, FileUp, Filter, X } from "lucide-react";
+import { Plus, Upload, Trash2, Download, History, Search, GitBranch, FolderOpen, FileUp, Filter, X, FileX, SearchX } from "lucide-react";
 import { useCategorias, useUploadDocumento, useDeleteDocumento, getDocumentoUrl, type Documento } from "@/lib/documentosStore";
 import { useProjetos } from "@/lib/projetosStore";
 import { addNotification } from "@/lib/notificationsStore";
@@ -34,6 +34,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRegistroPermissao } from "@/hooks/useRegistroPermissao";
 import { CollaboratorsSection } from "@/components/CollaboratorsSection";
 import { denyToast } from "@/lib/ownershipStore";
+import { EmptySelectMessage, EmptyState } from "@/components/ui/EmptyState";
 
 export const Route = createFileRoute("/documentos")({
   component: DocumentosPage,
@@ -102,25 +103,6 @@ function CardListSkeleton({ count = 4 }: { count?: number }) {
           </CardContent>
         </Card>
       ))}
-    </div>
-  );
-}
-interface EmptyStateProps {
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  description: string;
-}
-
-function EmptyState({ icon: Icon, title, description }: EmptyStateProps) {
-  return (
-    <div className="flex flex-col items-center justify-center text-center p-8 sm:p-12 border border-dashed border-muted rounded-2xl bg-card/50 backdrop-blur-md max-w-lg mx-auto my-8">
-      <div className="p-4 rounded-full bg-primary/10 mb-4 text-primary animate-pulse">
-        <Icon className="h-8 w-8" />
-      </div>
-      <h3 className="text-lg font-bold text-foreground mb-2">{title}</h3>
-      <p className="text-sm text-muted-foreground leading-relaxed max-w-xs">
-        {description}
-      </p>
     </div>
   );
 }
@@ -440,11 +422,18 @@ function DocumentosPage() {
                     </SelectTrigger>
                     <SelectContent className="max-h-60 rounded-lg shadow-lg border">
                       <SelectItem value="none">Sem categoria</SelectItem>
-                      {docCats.filter(c => c && c.id).map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.nome}
-                        </SelectItem>
-                      ))}
+                      {docCats.filter(c => c && c.id).length > 0 ? (
+                        docCats.filter(c => c && c.id).map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.nome}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <EmptySelectMessage
+                          title="Nenhuma categoria cadastrada."
+                          action={{ label: "Ir para Cadastros", href: "/cadastros" }}
+                        />
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -459,11 +448,19 @@ function DocumentosPage() {
                     </SelectTrigger>
                     <SelectContent className="max-h-60 rounded-lg shadow-lg border">
                       <SelectItem value="none">Sem projeto</SelectItem>
-                      {(projs ?? []).filter(p => p && p.id).map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.nome}
-                        </SelectItem>
-                      ))}
+                      {(projs ?? []).filter(p => p && p.id).length > 0 ? (
+                        (projs ?? []).filter(p => p && p.id).map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.nome}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <EmptySelectMessage
+                          title="Nenhum projeto cadastrado ainda."
+                          description="Acesse Projetos para cadastrar o primeiro."
+                          action={{ label: "Ir para Projetos", href: "/projetos" }}
+                        />
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -575,11 +572,18 @@ function DocumentosPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="todos" className="text-xs">Todas as categorias</SelectItem>
-                        {docCats.filter(c => c && c.id).map((c) => (
-                          <SelectItem key={c.id} value={c.id} className="text-xs">
-                            {c.nome}
-                          </SelectItem>
-                        ))}
+                        {docCats.filter(c => c && c.id).length > 0 ? (
+                          docCats.filter(c => c && c.id).map((c) => (
+                            <SelectItem key={c.id} value={c.id} className="text-xs">
+                              {c.nome}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <EmptySelectMessage
+                            title="Nenhuma categoria cadastrada."
+                            action={{ label: "Ir para Cadastros", href: "/cadastros" }}
+                          />
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -592,11 +596,19 @@ function DocumentosPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="todos" className="text-xs">Todos os projetos</SelectItem>
-                        {(projs ?? []).filter(p => p && p.id).map((p) => (
-                          <SelectItem key={p.id} value={p.id} className="text-xs">
-                            {p.nome}
-                          </SelectItem>
-                        ))}
+                        {(projs ?? []).filter(p => p && p.id).length > 0 ? (
+                          (projs ?? []).filter(p => p && p.id).map((p) => (
+                            <SelectItem key={p.id} value={p.id} className="text-xs">
+                              {p.nome}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <EmptySelectMessage
+                            title="Nenhum projeto cadastrado ainda."
+                            description="Acesse Projetos para cadastrar o primeiro."
+                            action={{ label: "Ir para Projetos", href: "/projetos" }}
+                          />
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -661,15 +673,20 @@ function DocumentosPage() {
         {isLoading ? (
           <CardListSkeleton count={4} />
         ) : rootDocs.length === 0 ? (
-          <EmptyState
-            icon={FileText}
-            title="Nenhum documento encontrado"
-            description={
-              hasActiveFilters
-                ? "Experimente mudar as palavras-chave ou remover os filtros aplicados."
-                : "Envie o primeiro documento institucional para iniciar a biblioteca."
-            }
-          />
+          hasActiveFilters ? (
+            <EmptyState
+              icon={<SearchX />}
+              title="Nenhum resultado encontrado"
+              description="Tente ajustar os filtros ou limpar a busca."
+              action={{ label: "Limpar filtros", onClick: clearFilters }}
+            />
+          ) : (
+            <EmptyState
+              icon={<FileX />}
+              title="Nenhum documento cadastrado"
+              description="Os documentos anexados em atividades aparecem aqui."
+            />
+          )
         ) : (
           <div className="grid gap-3.5">
             {rootDocs.map((doc) => {

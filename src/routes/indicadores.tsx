@@ -22,6 +22,7 @@ import {
   Calendar,
   MapPin,
   TrendingUp,
+  SearchX,
 } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
@@ -53,6 +54,7 @@ import { useTecnologias, CATEGORIAS } from "@/lib/tecnologiasStore";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatDate, formatBRL } from "@/lib/mockData";
 import chapadaLogo from "@/assets/chapada-logo.png";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export const Route = createFileRoute("/indicadores")({
   component: IndicadoresPage,
@@ -361,6 +363,14 @@ function IndicadoresPage() {
       if (dataAte && t.data > dataAte) return false;
       return true;
     }), [tecnologias, dataDe, dataAte]);
+  const hasFilterWithoutResults =
+    hasActiveFilters &&
+    (atividadesVinculadas.length > 0 ||
+      atividadesIndependentes.length > 0 ||
+      tecnologias.length > 0) &&
+    filteredVinculadas.length === 0 &&
+    filteredIndependentes.length === 0 &&
+    filteredTecnologias.length === 0;
 
   // ── KPIs ──────────────────────────────────────────────────────────────────────
   const ind = useMemo(() => {
@@ -776,6 +786,15 @@ function IndicadoresPage() {
             )}
           </CardContent>
         </Card>
+
+        {hasFilterWithoutResults && (
+          <EmptyState
+            icon={<SearchX />}
+            title="Nenhum resultado encontrado"
+            description="Tente ajustar os filtros ou limpar a busca."
+            action={{ label: "Limpar filtros", onClick: clearFilters }}
+          />
+        )}
 
         {/* ══════════════════════════════════════════════════════════════════════
             BLOCO 1 — 8 KPI Cards

@@ -41,11 +41,11 @@ import {
   Droplets,
   Users,
   MapPin,
-  Info,
   Wrench,
   Filter,
   X,
   Star,
+  SearchX,
 } from "lucide-react";
 import { formatDate } from "@/lib/mockData";
 import { Municipios } from "@/lib/cadastrosStore";
@@ -68,6 +68,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { trimText } from "@/utils/sanitize";
+import { EmptySelectMessage, EmptyState } from "@/components/ui/EmptyState";
 
 export const Route = createFileRoute("/tecnologias")({
   component: TecnologiasPage,
@@ -246,9 +247,10 @@ function TecnologiasPage() {
       dataDe !== "" ||
       dataAte !== "" ||
       linhaFiltro !== "all" ||
-      selProjeto !== "todos"
+      selProjeto !== "todos" ||
+      searchQuery.trim() !== ""
     );
-  }, [dataDe, dataAte, linhaFiltro, selProjeto]);
+  }, [dataDe, dataAte, linhaFiltro, selProjeto, searchQuery]);
 
   const clearFilters = () => {
     setDataDe("");
@@ -557,11 +559,21 @@ function TecnologiasPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="todos">Todos os projetos</SelectItem>
-                        {projetos?.filter(p => p.id && String(p.id).trim() !== "").map((p) => (
-                          <SelectItem key={p.id} value={String(p.id)} className="text-xs">
-                            {p.nome}
-                          </SelectItem>
-                        ))}
+                        {projetos.length > 0 ? (
+                          projetos
+                            .filter(p => p.id && String(p.id).trim() !== "")
+                            .map((p) => (
+                              <SelectItem key={p.id} value={String(p.id)} className="text-xs">
+                                {p.nome}
+                              </SelectItem>
+                            ))
+                        ) : (
+                          <EmptySelectMessage
+                            title="Nenhum projeto cadastrado ainda."
+                            description="Acesse Projetos para cadastrar o primeiro."
+                            action={{ label: "Ir para Projetos", href: "/projetos" }}
+                          />
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -616,17 +628,21 @@ function TecnologiasPage() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : gruposOrdenados.length === 0 ? (
-          <div className="chapada-empty">
-            <div className="chapada-empty-icon">
-              <Info className="h-8 w-8" />
-            </div>
-            <p className="text-base font-semibold text-foreground mb-1">
-              Nenhum registro de tecnologia encontrado.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Tente ajustar os filtros ou cadastre uma nova tecnologia.
-            </p>
-          </div>
+          tecnologias.length === 0 ? (
+            <EmptyState
+              icon={<Wrench />}
+              title="Nenhum registro de tecnologia encontrado"
+              description="Cadastre uma tecnologia social vinculada a um projeto."
+              action={{ label: "+ Nova Tecnologia", onClick: () => openCreate() }}
+            />
+          ) : (
+            <EmptyState
+              icon={<SearchX />}
+              title="Nenhum resultado encontrado"
+              description="Tente ajustar os filtros ou limpar a busca."
+              action={{ label: "Limpar filtros", onClick: clearFilters }}
+            />
+          )
         ) : (
           <div className="space-y-5">
             {gruposOrdenados.map(([linha, itens]) => {
@@ -1597,9 +1613,11 @@ function TecnologiaModal({
                         </SelectItem>
                       ))
                   ) : (
-                    <SelectItem value="none" disabled>
-                      Nenhum projeto cadastrado
-                    </SelectItem>
+                    <EmptySelectMessage
+                      title="Nenhum projeto cadastrado ainda."
+                      description="Acesse Projetos para cadastrar o primeiro."
+                      action={{ label: "Ir para Projetos", href: "/projetos" }}
+                    />
                   )}
                 </SelectContent>
               </Select>

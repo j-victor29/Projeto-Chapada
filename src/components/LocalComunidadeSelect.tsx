@@ -15,6 +15,7 @@ import {
   type LocalSuggestion,
 } from "@/lib/autocompleteHooks";
 import { toast } from "sonner";
+import { EmptySelectMessage } from "@/components/ui/EmptyState";
 
 // Ícones de tipo como texto (evita dependência de libs de emoji)
 const ICON_COMUNIDADE = "🏘️";
@@ -268,9 +269,10 @@ export function LocalComunidadeSelect({
               </button>
             </div>
           ) : inputValue.trim().length < 2 ? (
-            <div className="px-3 py-2 text-xs text-muted-foreground">
-              Digite ao menos 2 letras para buscar...
-            </div>
+            <EmptySelectMessage
+              title="Nenhuma comunidade cadastrada ainda."
+              description="Você pode digitar para criar uma nova."
+            />
           ) : null}
         </div>
       )}

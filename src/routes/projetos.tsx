@@ -43,8 +43,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, Search, X, Loader2, Check, Star, Users } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, X, Loader2, Check, Star, Users, FolderOpen, SearchX } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { EmptySelectMessage, EmptyState } from "@/components/ui/EmptyState";
 import { Progress } from "@/components/ui/progress";
 import {
   formatBRL,
@@ -136,7 +137,7 @@ function ProjetosPage() {
   const { favoritos, toggleFavorito, isFavorito } = useFavoritos();
 
   const [search, setSearch] = useState("");
-  const { query: globalQuery } = useGlobalSearch();
+  const { query: globalQuery, setQuery: setGlobalQuery } = useGlobalSearch();
   const { user } = useAuth();
   const { data: profiles = [] } = useQuery({
     queryKey: ["profiles_list"],
@@ -154,6 +155,20 @@ function ProjetosPage() {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<EditingState>(emptyProjeto);
+  const hasActiveFilters =
+    Boolean(search.trim()) ||
+    Boolean(globalQuery.trim()) ||
+    fFin !== "todos" ||
+    fMun !== "todos" ||
+    fStatus !== "todos";
+
+  const clearFilters = () => {
+    setSearch("");
+    setFFin("todos");
+    setFMun("todos");
+    setFStatus("todos");
+    setGlobalQuery("");
+  };
 
   // Validation rules using useFormValidation
   const validationRules = useMemo(() => ({
@@ -634,7 +649,11 @@ function ProjetosPage() {
                         </SelectItem>
                       ))
                     ) : (
-                      <SelectItem value="none" disabled>Nenhum financiador</SelectItem>
+                      <EmptySelectMessage
+                        title="Nenhum financiador cadastrado ainda."
+                        description="Acesse Cadastros > Financiadores."
+                        action={{ label: "Ir para Cadastros", href: "/cadastros" }}
+                      />
                     )}
                     <SelectItem value="__add_new__" className="text-primary font-medium border-t mt-1 pt-2">
                       <span className="flex items-center gap-1.5">
@@ -1037,6 +1056,11 @@ function ProjetosPage() {
               ))}
             </SelectContent>
           </Select>
+          {hasActiveFilters && (
+            <Button variant="ghost" type="button" onClick={clearFilters} className="gap-2">
+              <X className="h-4 w-4" /> Limpar filtros
+            </Button>
+          )}
         </CardContent>
       </Card>
 
@@ -1059,10 +1083,24 @@ function ProjetosPage() {
             <TableBody>
               {paginatedFiltered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
-                    {projetos.length === 0
-                      ? "Carregando projetos..."
-                      : "Nenhum projeto encontrado com os filtros selecionados."}
+                  <TableCell colSpan={9} className="p-6">
+                    {projetos.length === 0 ? (
+                      <EmptyState
+                        icon={<FolderOpen />}
+                        title="Nenhum projeto cadastrado ainda"
+                        description="Comece criando o primeiro projeto da CHAPADA."
+                        action={{ label: "+ Novo Projeto", onClick: openNew }}
+                        className="border-0"
+                      />
+                    ) : (
+                      <EmptyState
+                        icon={<SearchX />}
+                        title="Nenhum resultado encontrado"
+                        description="Tente ajustar os filtros ou limpar a busca."
+                        action={{ label: "Limpar filtros", onClick: clearFilters }}
+                        className="border-0"
+                      />
+                    )}
                   </TableCell>
                 </TableRow>
               ) : (

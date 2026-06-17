@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo, Suspense, useEffect } from "react";
+import { useState, useMemo, Suspense, useEffect, type ReactNode } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Trash2, Pencil, Search, X, Loader2 } from "lucide-react";
+import { Plus, Trash2, Pencil, Search, X, Loader2, MapPin, Building2, Tag, SearchX } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Municipios, Comunidades, Financiadores, Categorias, Publicos, Familias,
@@ -30,6 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export const Route = createFileRoute("/cadastros")({
   component: CadastrosPage,
@@ -68,7 +69,7 @@ function CadastrosPage() {
 
 function CrudShell({
   title, items, columns, renderForm, onSave, onDelete, getId, getRowValues, blank, canEdit, canDelete,
-  searchExternal, onSearchExternalChange, pagination, validate,
+  searchExternal, onSearchExternalChange, pagination, validate, emptyState,
 }: {
   title: string;
   items: any[] | undefined;
@@ -90,6 +91,12 @@ function CrudShell({
     pageSize: number;
   };
   validate?: (state: any) => Record<string, string>;
+  emptyState?: {
+    icon: ReactNode;
+    title: string;
+    description?: string;
+    actionLabel?: string;
+  };
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<any>(blank);
@@ -120,6 +127,11 @@ function CrudShell({
       });
     });
   }, [items, search, columns, getRowValues, isPaginated]);
+  const hasSearch = search.trim() !== "";
+  const clearSearch = () => {
+    setLocalSearch("");
+    onSearchExternalChange?.("");
+  };
 
   return (
     <Card className="chapada-filter-card shadow-sm">
@@ -228,8 +240,33 @@ function CrudShell({
               ))}
               {filteredItems.length === 0 && (
                 <tr>
-                  <td colSpan={columns.length + 1} className="px-4 py-12 text-center text-muted-foreground">
-                    Nenhum registro encontrado
+                  <td colSpan={columns.length + 1} className="px-4 py-6">
+                    {hasSearch || (items && items.length > 0) ? (
+                      <EmptyState
+                        icon={<SearchX />}
+                        title="Nenhum resultado encontrado"
+                        description="Tente ajustar os filtros ou limpar a busca."
+                        action={{ label: "Limpar filtros", onClick: clearSearch }}
+                        className="border-0"
+                      />
+                    ) : emptyState ? (
+                      <EmptyState
+                        icon={emptyState.icon}
+                        title={emptyState.title}
+                        description={emptyState.description}
+                        action={{
+                          label: emptyState.actionLabel ?? "Novo",
+                          onClick: () => setOpen(true),
+                        }}
+                        className="border-0"
+                      />
+                    ) : (
+                      <EmptyState
+                        icon={<SearchX />}
+                        title="Nenhum registro encontrado"
+                        className="border-0"
+                      />
+                    )}
                   </td>
                 </tr>
               )}
@@ -589,6 +626,11 @@ function ComunidadesTab() {
           count: totalCount,
           pageSize: 25,
         }}
+        emptyState={{
+          icon: <MapPin />,
+          title: "Nenhuma comunidade cadastrada",
+          actionLabel: "+ Nova Comunidade",
+        }}
         renderForm={(s, set, errors) => (
           <>
             <div className="space-y-1">
@@ -708,6 +750,11 @@ function TiposAcaoTab() {
       blank={{ nome: "", padrao: false, criado_via: "usuario" }}
       canEdit={(row) => !row.padrao}
       canDelete={(row) => !row.padrao}
+      emptyState={{
+        icon: <Tag />,
+        title: "Nenhum tipo de ação cadastrado",
+        actionLabel: "+ Novo Tipo",
+      }}
       renderForm={(s, set, errors) => (
         <div className="space-y-1">
           <Label htmlFor="tipo-nome">Nome do Tipo <span className="text-destructive">*</span></Label>
@@ -810,6 +857,11 @@ function FinanciadoresTab() {
         setPage,
         count: totalCount,
         pageSize: 25,
+      }}
+      emptyState={{
+        icon: <Building2 />,
+        title: "Nenhum financiador cadastrado",
+        actionLabel: "+ Novo Financiador",
       }}
       renderForm={(s, set, errors) => (
         <>

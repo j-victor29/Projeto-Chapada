@@ -34,11 +34,13 @@ import {
   Eye,
   ChevronLeft,
   ChevronRight,
+  SearchX,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export const Route = createFileRoute("/auditoria")({
   component: AuditoriaPage,
@@ -153,6 +155,15 @@ function AuditoriaPage() {
         .includes(q)
     );
   }, [logs, search]);
+  const hasActiveFilters =
+    search.trim() !== "" || fTabela !== "todos" || fAcao !== "todos";
+
+  const clearFilters = () => {
+    setSearch("");
+    setFTabela("todos");
+    setFAcao("todos");
+    setPage(0);
+  };
 
   const formatTimestamp = (ts: string) => {
     try {
@@ -192,7 +203,7 @@ function AuditoriaPage() {
     >
       {/* Filtros */}
       <Card className="mb-4 chapada-filter-card">
-        <CardContent className="p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <CardContent className="p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -224,6 +235,11 @@ function AuditoriaPage() {
               <SelectItem value="DELETE">DELETE</SelectItem>
             </SelectContent>
           </Select>
+          {hasActiveFilters && (
+            <Button variant="ghost" type="button" onClick={clearFilters} className="gap-2">
+              Limpar filtros
+            </Button>
+          )}
         </CardContent>
       </Card>
 
@@ -257,11 +273,23 @@ function AuditoriaPage() {
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-16 text-muted-foreground">
-                    <ShieldAlert className="h-10 w-10 mx-auto mb-3 text-muted" />
-                    {logs.length === 0
-                      ? "Nenhum log de auditoria encontrado. Certifique-se que a migration foi aplicada."
-                      : "Nenhum log encontrado com os filtros selecionados."}
+                  <TableCell colSpan={6} className="p-6">
+                    {logs.length === 0 && !hasActiveFilters ? (
+                      <EmptyState
+                        icon={<ShieldAlert />}
+                        title="Nenhum log de auditoria encontrado"
+                        description="Certifique-se que a migration foi aplicada."
+                        className="border-0"
+                      />
+                    ) : (
+                      <EmptyState
+                        icon={<SearchX />}
+                        title="Nenhum resultado encontrado"
+                        description="Tente ajustar os filtros ou limpar a busca."
+                        action={{ label: "Limpar filtros", onClick: clearFilters }}
+                        className="border-0"
+                      />
+                    )}
                   </TableCell>
                 </TableRow>
               ) : (
