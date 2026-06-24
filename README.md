@@ -18,9 +18,7 @@ Sistema de gestão do Centro de Habilitação e Apoio ao Pequeno Agricultor do A
 npm install
 ```
 
-2. Crie um arquivo `.env` na raiz a partir do `.env.example` e preencha as variáveis públicas do Supabase.
-
-3. Inicie o projeto:
+2. Inicie o projeto:
 
 ```bash
 npm run dev
