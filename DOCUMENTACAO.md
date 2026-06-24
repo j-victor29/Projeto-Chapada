@@ -40,6 +40,6 @@ A documentação está dividida e organizada nos seguintes caminhos no repositó
 ---
 
 ## 🚀 Como Iniciar Localmente
-1. Instale as dependências: `npm install` ou `bun install`.
+1. Instale as dependências: `npm install`.
 2. Configure o arquivo `.env` local contendo as chaves de API públicas do Supabase.
 3. Inicie o servidor Vite: `npm run dev`.
